@@ -92,6 +92,7 @@ export interface AppCategory {
   category: string
   productivityRating: ProductivityRating
   isUserDefined: boolean
+  isManual?: boolean
   createdAt: number
   updatedAt: number
 }
@@ -359,6 +360,7 @@ export interface FocusSessionConfig {
   enableNotifications: boolean
   enableSounds: boolean
   autoStartBreaks: boolean
+  autoStartFocus?: boolean
   strictMode: boolean // blocks all non-allowed apps
 }
 
@@ -375,6 +377,11 @@ export interface ActiveFocusSession {
   totalPausedTime: number
   interruptions: number
   focusScore: number
+  duration: number
+  timeRemaining: number
+  status: 'running' | 'paused' | 'completed' | 'break'
+  type: 'focus' | 'break' | 'long_break'
+  isActive: boolean
 }
 
 export interface FocusSessionAnalytics {

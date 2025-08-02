@@ -108,8 +108,16 @@ function setupIPC(): void {
 
   // Dashboard data
   ipcMain.handle('dashboard:get-data', async (): Promise<DashboardData> => {
+    console.log('=== IPC dashboard:get-data called ===')
     try {
-      return await databaseManager.getDashboardData()
+      console.log('Calling databaseManager.getDashboardData()')
+      const data = await databaseManager.getDashboardData()
+      console.log('Dashboard data retrieved successfully:')
+      console.log('- Keys:', Object.keys(data))
+      console.log('- Today data keys:', data.today ? Object.keys(data.today) : 'undefined')
+      console.log('- Today totalTime:', data.today?.totalTime)
+      console.log('- Data structure valid:', !!(data.today && data.thisWeek && data.insights))
+      return data
     } catch (error) {
       console.error('Failed to get dashboard data:', error)
       throw error
@@ -130,6 +138,34 @@ function setupIPC(): void {
   ipcMain.handle('data:export', async (_, _format: 'json' | 'csv') => {
     // TODO: Implement data export functionality
     return { success: false, error: 'Export not implemented yet' }
+  })
+
+  // Productivity Insights
+  ipcMain.handle('insights:get-productivity', async (_, limit?: number) => {
+    try {
+      return await databaseManager.getProductivityInsights(limit || 10)
+    } catch (error) {
+      console.error('Failed to get productivity insights:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('insights:get-all', async (_, category?: string, limit?: number) => {
+    try {
+      return await databaseManager.getInsights(category, limit || 20)
+    } catch (error) {
+      console.error('Failed to get insights:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('insights:generate', async (_, timeRange: { start: number, end: number }) => {
+    try {
+      return await activityTracker.getProductivityInsights(timeRange)
+    } catch (error) {
+      console.error('Failed to generate insights:', error)
+      throw error
+    }
   })
 
   // Settings
@@ -191,9 +227,12 @@ function setupIPC(): void {
         for (const suggestion of suggestions) {
           await databaseManager.saveAppCategory({
             appName: suggestion.appName,
-            category: suggestion.category,
-            productivityRating: suggestion.productivityRating,
-            isManual: false
+            category: suggestion.suggestedCategory,
+            productivityRating: suggestion.suggestedProductivityRating,
+            isUserDefined: false,
+            isManual: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
           })
         }
         return { success: true }
@@ -293,6 +332,26 @@ function setupIPC(): void {
         return { success: true }
       } catch (error) {
         console.error('Failed to save focus session settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:pause', async () => {
+      try {
+        await focusManager.pauseFocusSession()
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to pause focus session:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:resume', async () => {
+      try {
+        await focusManager.resumeFocusSession()
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to resume focus session:', error)
         throw error
       }
     })

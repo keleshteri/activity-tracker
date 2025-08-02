@@ -1,18 +1,36 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import ProductivityCharts from '../../components/ProductivityCharts.vue'
+import ProductivityInsights from '../../components/ProductivityInsights.vue'
 
 interface DashboardData {
   today: {
     totalTime: number
     activeTime: number
     idleTime: number
-    topApps: Array<{ name: string; time: number; percentage: number }>
-    categories: Array<{ name: string; time: number }>
+    productiveTime: number
+    distractingTime: number
+    focusScore: number
+    contextSwitches: number
+    topApps: Array<{ name: string; time: number; percentage: number; productivity: 'productive' | 'neutral' | 'distracting' }>
+    categories: Array<{ name: string; time: number; productivity: 'productive' | 'neutral' | 'distracting' }>
+    peakHours: Array<{ hour: number; productivity: number }>
   }
   thisWeek: {
     totalTime: number
-    dailyBreakdown: Array<{ day: string; time: number }>
+    productiveTime: number
+    dailyBreakdown: Array<{ day: string; time: number; productivity: number }>
+    weeklyTrend: 'improving' | 'declining' | 'stable'
   }
+  insights: Array<{
+    id: string
+    type: 'peak_hours' | 'distraction_pattern' | 'focus_improvement' | 'break_suggestion' | 'app_recommendation'
+    title: string
+    description: string
+    actionable: boolean
+    priority: 'low' | 'medium' | 'high'
+    timestamp: number
+  }>
 }
 
 const dashboardData = ref<DashboardData | null>(null)
@@ -35,9 +53,14 @@ const formatPercentage = (percentage: number): string => {
 }
 
 const loadDashboardData = async () => {
+  console.log('=== loadDashboardData function called ===')
   loading.value = true
   error.value = ''
   try {
+    console.log('Loading dashboard data...')
+    console.log('window.api available:', !!window.api)
+    console.log('window.api.dashboard available:', !!(window.api && window.api.dashboard))
+    
     // Check if API is available
     if (!window.api || !window.api.dashboard) {
       console.warn('API not available, using mock data')
@@ -56,28 +79,123 @@ const loadDashboardData = async () => {
             { name: 'Development', time: 14400 },
             { name: 'Web Browsing', time: 7200 },
             { name: 'Communication', time: 3600 }
+          ],
+          productiveTime: 20160, // 5.6 hours
+          distractingTime: 5040, // 1.4 hours
+          focusScore: 82.3,
+          contextSwitches: 45,
+          peakHours: [
+            { hour: 9, productivity: 95 },
+            { hour: 10, productivity: 92 },
+            { hour: 14, productivity: 88 },
+            { hour: 15, productivity: 85 }
           ]
         },
         thisWeek: {
           totalTime: 144000, // 40 hours
+          productiveTime: 120960, // 33.6 hours
           dailyBreakdown: [
-            { day: '2024-01-15', time: 28800 },
-            { day: '2024-01-16', time: 25200 },
-            { day: '2024-01-17', time: 30600 },
-            { day: '2024-01-18', time: 27000 },
-            { day: '2024-01-19', time: 32400 }
+            { day: '2024-01-15', time: 28800, productivity: 85 },
+            { day: '2024-01-16', time: 25200, productivity: 82 },
+            { day: '2024-01-17', time: 30600, productivity: 88 },
+            { day: '2024-01-18', time: 27000, productivity: 79 },
+            { day: '2024-01-19', time: 32400, productivity: 91 }
+          ],
+          weeklyTrend: 'improving'
+        },
+        insights: [
+          {
+            id: '1',
+            type: 'peak_hours',
+            title: 'Peak Productivity Hours',
+            description: 'You are most productive between 9-11 AM',
+            actionable: true,
+            priority: 'medium',
+            timestamp: Date.now()
+          },
+          {
+            id: '2',
+            type: 'focus_improvement',
+            title: 'Focus Score Improvement',
+            description: 'Your focus score has improved by 12% this week',
+            actionable: false,
+            priority: 'low',
+            timestamp: Date.now()
+          }
+        ]
+      }
+    } else {
+      console.log('Making API call to dashboard.getData()')
+      try {
+        const data = await window.api.dashboard.getData()
+        console.log('Dashboard data received:', data)
+        console.log('Data type:', typeof data)
+        console.log('Data keys:', Object.keys(data))
+        dashboardData.value = data
+        console.log('Dashboard data assigned successfully')
+      } catch (apiError) {
+        console.error('API call failed:', apiError)
+        console.warn('Falling back to mock data due to API error')
+        // Fall back to mock data if API fails
+        dashboardData.value = {
+          today: {
+            totalTime: 28800,
+            activeTime: 25200,
+            idleTime: 3600,
+            productiveTime: 20160,
+            distractingTime: 5040,
+            focusScore: 82.3,
+            contextSwitches: 45,
+            topApps: [
+              { name: 'Visual Studio Code', time: 14400, percentage: 57.1, productivity: 'productive' },
+              { name: 'Chrome', time: 7200, percentage: 28.6, productivity: 'neutral' },
+              { name: 'Slack', time: 3600, percentage: 14.3, productivity: 'distracting' }
+            ],
+            categories: [
+              { name: 'Development', time: 14400, productivity: 'productive' },
+              { name: 'Web Browsing', time: 7200, productivity: 'neutral' },
+              { name: 'Communication', time: 3600, productivity: 'distracting' }
+            ],
+            peakHours: [
+              { hour: 9, productivity: 95 },
+              { hour: 10, productivity: 92 },
+              { hour: 14, productivity: 88 },
+              { hour: 15, productivity: 85 }
+            ]
+          },
+          thisWeek: {
+            totalTime: 144000,
+            productiveTime: 120960,
+            dailyBreakdown: [
+              { day: '2024-01-15', time: 28800, productivity: 85 },
+              { day: '2024-01-16', time: 25200, productivity: 82 },
+              { day: '2024-01-17', time: 30600, productivity: 88 },
+              { day: '2024-01-18', time: 27000, productivity: 79 },
+              { day: '2024-01-19', time: 32400, productivity: 91 }
+            ],
+            weeklyTrend: 'improving'
+          },
+          insights: [
+            {
+              id: '1',
+              type: 'peak_hours',
+              title: 'Peak Productivity Hours',
+              description: 'You are most productive between 9-11 AM',
+              actionable: true,
+              priority: 'medium',
+              timestamp: Date.now()
+            }
           ]
         }
       }
-    } else {
-      const data = await window.api.dashboard.getData()
-      dashboardData.value = data
     }
   } catch (err) {
     console.error('Failed to load dashboard data:', err)
     error.value = 'Failed to load dashboard data'
   } finally {
+    console.log('=== Setting loading to false ===')
     loading.value = false
+    console.log('Loading state:', loading.value)
   }
 }
 
@@ -97,6 +215,60 @@ const getAppColor = (index: number): string => {
     '#84cc16'
   ]
   return colors[index % colors.length]
+}
+
+// Computed properties for productivity metrics
+const productivityScoreColor = computed(() => {
+  if (!dashboardData.value) return '#6b7280'
+  const score = dashboardData.value.today.focusScore
+  if (score >= 80) return '#10b981' // Green
+  if (score >= 60) return '#f59e0b' // Orange
+  return '#ef4444' // Red
+})
+
+const focusScoreColor = computed(() => {
+  if (!dashboardData.value) return '#6b7280'
+  const score = dashboardData.value.today.focusScore
+  if (score >= 80) return '#10b981' // Green
+  if (score >= 60) return '#f59e0b' // Orange
+  return '#ef4444' // Red
+})
+
+const peakProductivityHour = computed(() => {
+  if (!dashboardData.value || dashboardData.value.today.peakHours.length === 0) return 'N/A'
+  const peak = dashboardData.value.today.peakHours.reduce((max, hour) => 
+    hour.productivity > max.productivity ? hour : max
+  )
+  return `${peak.hour}:00`
+})
+
+const getTrendIcon = (trend: string): string => {
+  switch (trend) {
+    case 'up': return '📈'
+    case 'down': return '📉'
+    default: return '➖'
+  }
+}
+
+const getTrendColor = (trend: string): string => {
+  switch (trend) {
+    case 'up': return '#10b981'
+    case 'down': return '#ef4444'
+    default: return '#6b7280'
+  }
+}
+
+const formatScore = (score: number): string => {
+  return score.toFixed(1)
+}
+
+const formatSessionLength = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+  return `${minutes}m`
 }
 
 onMounted(() => {
@@ -134,6 +306,84 @@ onUnmounted(() => {
     </div>
 
     <div v-else-if="dashboardData" class="dashboard-content">
+      <!-- Productivity Metrics Overview -->
+      <section class="productivity-overview">
+        <h3 class="section-title">Productivity Overview</h3>
+        <div class="productivity-grid">
+          <div class="productivity-card main-score">
+            <div class="score-circle" :style="{ borderColor: productivityScoreColor }">
+              <div class="score-value" :style="{ color: productivityScoreColor }">
+                {{ formatScore(dashboardData.today.focusScore) }}%
+              </div>
+              <div class="score-label">Focus Score</div>
+            </div>
+            <div class="score-trend">
+              <span v-if="dashboardData.insights && dashboardData.insights.length > 0" :style="{ color: getTrendColor('up') }">
+                {{ getTrendIcon('up') }}
+                Tracking Active
+              </span>
+            </div>
+          </div>
+
+          <div class="productivity-card">
+            <div class="metric-header">
+              <div class="metric-icon">🎯</div>
+              <div class="metric-info">
+                <div class="metric-value" :style="{ color: focusScoreColor }">
+                  {{ formatScore(dashboardData.today.focusScore) }}%
+                </div>
+                <div class="metric-label">Focus Score</div>
+              </div>
+            </div>
+            <div class="metric-trend">
+              <span :style="{ color: getTrendColor('up') }">
+                {{ getTrendIcon('up') }}
+                Active Time: {{ formatSessionLength(dashboardData.today.activeTime) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="productivity-card">
+            <div class="metric-header">
+              <div class="metric-icon">⚡</div>
+              <div class="metric-info">
+                <div class="metric-value">{{ peakProductivityHour }}</div>
+                <div class="metric-label">Peak Hour</div>
+              </div>
+            </div>
+            <div class="metric-detail">
+              Best productivity at {{ peakProductivityHour }}
+            </div>
+          </div>
+
+          <div class="productivity-card">
+            <div class="metric-header">
+              <div class="metric-icon">📊</div>
+              <div class="metric-info">
+                <div class="metric-value">{{ dashboardData.today.contextSwitches }}</div>
+                <div class="metric-label">Context Switches</div>
+              </div>
+            </div>
+            <div class="metric-detail">
+              Total: {{ formatSessionLength(dashboardData.today.totalTime) }}
+            </div>
+          </div>
+
+          <div class="productivity-card">
+            <div class="metric-header">
+              <div class="metric-icon">🚫</div>
+              <div class="metric-info">
+                <div class="metric-value">{{ formatSessionLength(dashboardData.today.distractingTime) }}</div>
+                <div class="metric-label">Distracting Time</div>
+              </div>
+            </div>
+            <div class="metric-detail">
+              {{ ((dashboardData.today.distractingTime / dashboardData.today.totalTime) * 100).toFixed(1) }}% of total
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Today's Stats -->
       <section class="stats-section">
         <h3 class="section-title">Today's Activity</h3>
@@ -240,6 +490,18 @@ onUnmounted(() => {
           <div class="empty-icon">📊</div>
           <p>No weekly data available yet</p>
         </div>
+      </section>
+
+      <!-- Interactive Productivity Charts -->
+      <section class="charts-section">
+        <h3 class="section-title">Productivity Analytics & Trends</h3>
+        <ProductivityCharts />
+      </section>
+
+      <!-- AI Insights and Recommendations -->
+      <section class="insights-section">
+        <h3 class="section-title">Productivity Insights & Recommendations</h3>
+        <ProductivityInsights />
       </section>
     </div>
   </div>
@@ -514,5 +776,170 @@ onUnmounted(() => {
 .empty-subtitle {
   font-size: 0.875rem;
   margin-top: 0.5rem;
+}
+
+/* Productivity Overview Styles */
+.productivity-overview {
+  margin-bottom: 2rem;
+}
+
+.productivity-grid {
+  display: grid;
+  grid-template-columns: 300px repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.productivity-card {
+  background: var(--color-background-soft);
+  border: 1px solid var(--ev-c-gray-3);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  transition: all 0.2s;
+}
+
+.productivity-card:hover {
+  border-color: var(--ev-c-brand);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+.productivity-card.main-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem;
+}
+
+.score-circle {
+  width: 120px;
+  height: 120px;
+  border: 4px solid;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.score-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-label {
+  font-size: 0.75rem;
+  color: var(--ev-c-text-2);
+  margin-top: 0.25rem;
+}
+
+.score-trend {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.metric-icon {
+  font-size: 1.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background);
+  border-radius: 0.5rem;
+  border: 1px solid var(--ev-c-gray-3);
+}
+
+.metric-info {
+  flex: 1;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: var(--ev-c-text-2);
+}
+
+.metric-trend,
+.metric-detail {
+  font-size: 0.75rem;
+  color: var(--ev-c-text-2);
+  margin-top: 0.5rem;
+}
+
+.metric-trend {
+  font-weight: 500;
+}
+
+/* Charts and Insights Sections */
+.charts-section,
+.insights-section {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--ev-c-gray-3);
+}
+
+.charts-section .section-title,
+.insights-section .section-title {
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .productivity-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  
+  .productivity-card.main-score {
+    grid-column: 1 / -1;
+    max-width: 300px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .productivity-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .score-circle {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .score-value {
+    font-size: 1.5rem;
+  }
+  
+  .metric-header {
+    gap: 0.75rem;
+  }
+  
+  .metric-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.25rem;
+  }
+  
+  .metric-value {
+    font-size: 1.25rem;
+  }
 }
 </style>

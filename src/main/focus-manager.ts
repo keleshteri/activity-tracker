@@ -8,14 +8,16 @@ export class FocusManager extends EventEmitter {
   private focusTimer: NodeJS.Timeout | null = null
   private breakTimer: NodeJS.Timeout | null = null
   private pomodoroConfig: FocusSessionConfig = {
-    focusDuration: 25 * 60 * 1000, // 25 minutes
-    shortBreakDuration: 5 * 60 * 1000, // 5 minutes
-    longBreakDuration: 15 * 60 * 1000, // 15 minutes
+    duration: 25, // 25 minutes
+    type: 'pomodoro',
+    breakDuration: 5, // 5 minutes
+    longBreakDuration: 15, // 15 minutes
     sessionsUntilLongBreak: 4,
     autoStartBreaks: false,
     autoStartFocus: false,
-    soundEnabled: true,
-    notificationsEnabled: true
+    enableSounds: true,
+    enableNotifications: true,
+    strictMode: false
   }
   private completedSessions: number = 0
 
@@ -38,18 +40,26 @@ export class FocusManager extends EventEmitter {
     this.activeFocusSession = {
       id: `focus_${startTime}`,
       startTime,
-      duration: this.pomodoroConfig.focusDuration,
+      duration: this.pomodoroConfig.duration * 60 * 1000,
       type: 'focus',
       isActive: true,
-      timeRemaining: this.pomodoroConfig.focusDuration,
+      timeRemaining: this.pomodoroConfig.duration * 60 * 1000,
       interruptions: 0,
-      config: this.pomodoroConfig
+      config: this.pomodoroConfig,
+      plannedEndTime: startTime + (this.pomodoroConfig.duration * 60 * 1000),
+      currentPhase: 'focus',
+      phaseStartTime: startTime,
+      sessionsCompleted: 0,
+      isPaused: false,
+      totalPausedTime: 0,
+      focusScore: 0,
+      status: 'running'
     }
 
     // Start the focus timer
     this.focusTimer = setTimeout(() => {
       this.completeFocusSession()
-    }, this.pomodoroConfig.focusDuration)
+    }, this.pomodoroConfig.duration * 60 * 1000)
 
     // Update time remaining every second
     this.startTimeTracking()
@@ -100,7 +110,7 @@ export class FocusManager extends EventEmitter {
     this.emit('focus-session-resumed', this.activeFocusSession)
   }
 
-  async recordInterruption(appName: string, context?: string): Promise<void> {
+  async recordInterruption(appName: string): Promise<void> {
     if (!this.activeFocusSession) {
       return
     }
@@ -110,12 +120,13 @@ export class FocusManager extends EventEmitter {
     // Save distraction event
     const distractionEvent: DistractionEvent = {
       timestamp: Date.now(),
+      type: 'focus_loss',
       appName,
       duration: 0, // Will be calculated when interruption ends
       severity: 'medium',
-      notificationSent: false,
-      userAcknowledged: false,
-      context
+      contextSwitches: 1,
+      wasNotified: false,
+      userResponse: undefined
     }
 
     await this.db.saveDistractionEvent(distractionEvent)
@@ -131,19 +142,27 @@ export class FocusManager extends EventEmitter {
     }
 
     const duration = type === 'short' 
-      ? this.pomodoroConfig.shortBreakDuration 
+      ? this.pomodoroConfig.breakDuration 
       : this.pomodoroConfig.longBreakDuration
 
     const startTime = Date.now()
     this.activeFocusSession = {
       id: `break_${startTime}`,
+      config: this.pomodoroConfig,
       startTime,
-      duration,
-      type: 'break',
-      isActive: true,
-      timeRemaining: duration,
+      plannedEndTime: startTime + ((duration || this.pomodoroConfig.breakDuration || 5) * 60 * 1000),
+      currentPhase: 'break',
+      phaseStartTime: startTime,
+      sessionsCompleted: this.completedSessions,
+      isPaused: false,
+      totalPausedTime: 0,
       interruptions: 0,
-      config: this.pomodoroConfig
+      focusScore: 0,
+      duration: (duration || this.pomodoroConfig.breakDuration || 5) * 60 * 1000,
+      timeRemaining: (duration || this.pomodoroConfig.breakDuration || 5) * 60 * 1000,
+      status: 'break',
+      type: 'break',
+      isActive: true
     }
 
     this.breakTimer = setTimeout(() => {
@@ -191,7 +210,6 @@ export class FocusManager extends EventEmitter {
     const focusScore = this.calculateFocusScore(completionRate, this.activeFocusSession.interruptions)
 
     const focusSession: FocusSession = {
-      id: this.activeFocusSession.id,
       startTime: this.activeFocusSession.startTime,
       endTime,
       duration: actualDuration,
@@ -219,7 +237,7 @@ export class FocusManager extends EventEmitter {
 
     // Auto-start break if enabled
     if (this.pomodoroConfig.autoStartBreaks && !manual) {
-      const breakType = this.completedSessions % this.pomodoroConfig.sessionsUntilLongBreak === 0 
+      const breakType = this.completedSessions % (this.pomodoroConfig.sessionsUntilLongBreak || 4) === 0 
         ? 'long' 
         : 'short'
       setTimeout(() => this.startBreak(breakType), 1000)

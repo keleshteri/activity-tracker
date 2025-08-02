@@ -31,21 +31,26 @@ export class DistractionDetector extends EventEmitter {
       if (!this.settings) {
         // Create default settings
         this.settings = {
-          enabled: true,
-          thresholdMinutes: 5,
-          notificationType: 'gentle',
-          notificationFrequency: 15,
-          quietHoursEnabled: false,
-          quietHoursStart: '22:00',
-          quietHoursEnd: '08:00',
-          excludedApps: [],
-          breakReminderEnabled: true,
-          breakReminderInterval: 30,
-          focusModeEnabled: false
+          enableDistractionDetection: true,
+          distractionThreshold: 5,
+          contextSwitchThreshold: 10,
+          enableNotifications: true,
+          notificationStyle: 'gentle',
+          quietHours: {
+            enabled: false,
+            start: '22:00',
+            end: '08:00'
+          },
+          blockedApps: [],
+          allowedBreakApps: [],
+          focusSessionReminders: true,
+          breakReminders: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
         }
         await this.db.saveDistractionSettings(this.settings)
       }
-      this.isEnabled = this.settings.enabled
+      this.isEnabled = this.settings?.enableDistractionDetection ?? true
     } catch (error) {
       console.error('Failed to load distraction settings:', error)
     }
@@ -70,7 +75,7 @@ export class DistractionDetector extends EventEmitter {
     
     this.settings = { ...this.settings!, ...newSettings }
     await this.db.saveDistractionSettings(this.settings)
-    this.isEnabled = this.settings.enabled
+    this.isEnabled = this.settings?.enableDistractionDetection ?? true
     
     this.emit('settings-updated', this.settings)
   }
@@ -86,7 +91,7 @@ export class DistractionDetector extends EventEmitter {
     }
 
     // Check if app is excluded
-    if (this.settings.excludedApps.includes(activity.appName)) {
+    if (this.settings?.blockedApps?.includes(activity.appName)) {
       return
     }
 
@@ -113,7 +118,7 @@ export class DistractionDetector extends EventEmitter {
       return
     }
 
-    const thresholdMs = this.settings!.thresholdMinutes * 60 * 1000
+    const thresholdMs = this.settings!.distractionThreshold * 60 * 1000
     
     this.distractionTimer = setTimeout(() => {
       this.handleDistractionDetected(appName, thresholdMs)
@@ -125,7 +130,7 @@ export class DistractionDetector extends EventEmitter {
     
     // Check notification cooldown
     const lastNotification = this.notificationCooldown.get(appName) || 0
-    const cooldownMs = this.settings!.notificationFrequency * 60 * 1000
+    const cooldownMs = 15 * 60 * 1000 // 15 minutes default cooldown
     
     if (now - lastNotification < cooldownMs) {
       return
@@ -142,21 +147,22 @@ export class DistractionDetector extends EventEmitter {
     // Create distraction event
     const distractionEvent: DistractionEvent = {
       timestamp: now,
+      type: 'app_distraction',
       appName,
       duration,
       severity,
-      notificationSent: false,
-      userAcknowledged: false,
-      context: `Spent ${Math.round(duration / 60000)} minutes on potentially distracting app`
+      contextSwitches: 0,
+      wasNotified: false,
+      userResponse: undefined
     }
 
     // Save to database
     await this.db.saveDistractionEvent(distractionEvent)
 
     // Send notification if enabled
-    if (this.settings!.notificationType !== 'none') {
+    if (this.settings!.notificationStyle !== 'gentle') {
       await this.sendDistractionNotification(distractionEvent)
-      distractionEvent.notificationSent = true
+      distractionEvent.wasNotified = true
       this.notificationCooldown.set(appName, now)
     }
 
@@ -169,7 +175,7 @@ export class DistractionDetector extends EventEmitter {
       return
     }
 
-    const thresholdMs = this.settings!.thresholdMinutes * 60 * 1000
+    const thresholdMs = this.settings!.distractionThreshold * 60 * 1000
     if (duration >= thresholdMs) {
       await this.handleDistractionDetected(appName, duration)
     }
@@ -186,7 +192,7 @@ export class DistractionDetector extends EventEmitter {
     let title = 'Distraction Detected'
     let message = `You've been using ${event.appName} for ${Math.round(event.duration / 60000)} minutes`
     
-    switch (this.settings!.notificationType) {
+    switch (this.settings!.notificationStyle) {
       case 'gentle':
         title = 'Gentle Reminder'
         message = `Consider taking a break from ${event.appName}? You've been focused on it for a while.`
@@ -213,15 +219,15 @@ export class DistractionDetector extends EventEmitter {
   }
 
   private isInQuietHours(): boolean {
-    if (!this.settings?.quietHoursEnabled) {
+    if (!this.settings?.quietHours.enabled) {
       return false
     }
 
     const now = new Date()
     const currentTime = now.getHours() * 60 + now.getMinutes()
     
-    const [startHour, startMin] = this.settings.quietHoursStart.split(':').map(Number)
-    const [endHour, endMin] = this.settings.quietHoursEnd.split(':').map(Number)
+    const [startHour, startMin] = this.settings?.quietHours?.start?.split(':').map(Number) ?? [0, 0]
+    const [endHour, endMin] = this.settings?.quietHours?.end?.split(':').map(Number) ?? [23, 59]
     
     const startTime = startHour * 60 + startMin
     const endTime = endHour * 60 + endMin
@@ -321,7 +327,7 @@ export class DistractionDetector extends EventEmitter {
   }
 
   isDistractionDetectionEnabled(): boolean {
-    return this.isEnabled && this.settings?.enabled === true
+    return this.isEnabled && this.settings?.enableDistractionDetection === true
   }
 
   destroy(): void {

@@ -61,10 +61,11 @@ const toggleTracking = async () => {
 }
 
 onMounted(() => {
+  console.log('=== App.vue mounted, activeTab:', activeTab.value)
   console.log('App mounted, window.api available:', !!window.api)
   console.log('window.api.tracker available:', !!(window.api && window.api.tracker))
   updateStatus()
-  statusInterval.value = setInterval(updateStatus, 2000)
+  statusInterval.value = setInterval(updateStatus, 5000)
 })
 
 onUnmounted(() => {
@@ -116,7 +117,7 @@ onUnmounted(() => {
 
     <!-- Main Content -->
     <main class="app-main">
-      <Dashboard v-if="activeTab === 'dashboard'" />
+      <Dashboard v-if="activeTab === 'dashboard'" key="dashboard" />
       <ActivityLog v-if="activeTab === 'activity'" />
       <FocusSession v-if="activeTab === 'focus'" />
       <DistractionManagement v-if="activeTab === 'distraction'" />

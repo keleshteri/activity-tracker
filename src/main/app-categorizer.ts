@@ -123,9 +123,10 @@ export class AppCategorizer {
       return {
         appName,
         suggestedCategory: exactMatch.category,
-        suggestedProductivity: exactMatch.productivity,
+        suggestedProductivityRating: exactMatch.productivity,
         confidence: 0.95,
-        reason: 'Known application'
+        reason: 'Known application',
+        isCommonApp: true
       }
     }
 
@@ -135,9 +136,10 @@ export class AppCategorizer {
         return {
           appName,
           suggestedCategory: info.category,
-          suggestedProductivity: info.productivity,
+          suggestedProductivityRating: info.productivity,
           confidence: 0.7,
-          reason: `Similar to ${knownApp}`
+          reason: `Similar to ${knownApp}`,
+          isCommonApp: true
         }
       }
     }
@@ -152,9 +154,10 @@ export class AppCategorizer {
     return {
       appName,
       suggestedCategory: 'Uncategorized',
-      suggestedProductivity: 'neutral',
+      suggestedProductivityRating: 'neutral',
       confidence: 0.3,
-      reason: 'Unknown application - manual review recommended'
+      reason: 'Unknown application - manual review recommended',
+      isCommonApp: false
     }
   }
 
@@ -172,9 +175,10 @@ export class AppCategorizer {
       return {
         appName,
         suggestedCategory: 'Development',
-        suggestedProductivity: 'productive',
+        suggestedProductivityRating: 'productive',
         confidence: 0.8,
-        reason: 'Contains development-related keywords'
+        reason: 'Contains development-related keywords',
+        isCommonApp: false
       }
     }
 
@@ -188,9 +192,10 @@ export class AppCategorizer {
       return {
         appName,
         suggestedCategory: 'Entertainment',
-        suggestedProductivity: 'distracting',
+        suggestedProductivityRating: 'distracting',
         confidence: 0.8,
-        reason: 'Contains gaming-related keywords'
+        reason: 'Contains gaming-related keywords',
+        isCommonApp: false
       }
     }
 
@@ -204,9 +209,10 @@ export class AppCategorizer {
       return {
         appName,
         suggestedCategory: 'Entertainment',
-        suggestedProductivity: 'distracting',
+        suggestedProductivityRating: 'distracting',
         confidence: 0.7,
-        reason: 'Contains media-related keywords'
+        reason: 'Contains media-related keywords',
+        isCommonApp: false
       }
     }
 
@@ -221,9 +227,10 @@ export class AppCategorizer {
       return {
         appName,
         suggestedCategory: 'Productivity',
-        suggestedProductivity: 'productive',
+        suggestedProductivityRating: 'productive',
         confidence: 0.8,
-        reason: 'Contains productivity-related keywords'
+        reason: 'Contains productivity-related keywords',
+        isCommonApp: false
       }
     }
 
@@ -237,9 +244,10 @@ export class AppCategorizer {
       return {
         appName,
         suggestedCategory: 'Communication',
-        suggestedProductivity: 'neutral',
+        suggestedProductivityRating: 'neutral',
         confidence: 0.7,
-        reason: 'Contains communication-related keywords'
+        reason: 'Contains communication-related keywords',
+        isCommonApp: false
       }
     }
 
@@ -252,9 +260,10 @@ export class AppCategorizer {
       return {
         appName,
         suggestedCategory: 'Browser',
-        suggestedProductivity: 'neutral',
+        suggestedProductivityRating: 'neutral',
         confidence: 0.9,
-        reason: 'Browser application'
+        reason: 'Browser application',
+        isCommonApp: true
       }
     }
 
@@ -266,7 +275,7 @@ export class AppCategorizer {
       appName,
       category,
       productivityRating: productivity,
-      userDefined,
+      isUserDefined: userDefined,
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
@@ -284,7 +293,7 @@ export class AppCategorizer {
           await this.categorizeApp(
             suggestion.appName,
             suggestion.suggestedCategory,
-            suggestion.suggestedProductivity,
+            suggestion.suggestedProductivityRating,
             false // Auto-categorized
           )
           applied++
