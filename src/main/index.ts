@@ -6,6 +6,9 @@ import icon from '../../resources/icon.png?asset'
 // Import our activity tracker components
 import { DatabaseManager } from './database'
 import { ActivityTracker } from './tracker'
+import { FocusManager } from './focus-manager'
+import { DistractionDetector } from './distraction-detector'
+import { AppCategorizer } from './app-categorizer'
 import { TrackerConfig, DashboardData } from './types'
 
 // Set app name early for proper recognition
@@ -13,8 +16,11 @@ app.setName('Activity Tracking')
 
 // Global instances
 let mainWindow: BrowserWindow | null = null
-let database: DatabaseManager
-let tracker: ActivityTracker
+let databaseManager: DatabaseManager
+let activityTracker: ActivityTracker
+let focusManager: FocusManager
+let distractionDetector: DistractionDetector
+let appCategorizer: AppCategorizer
 
 function createWindow(): void {
   // Create the browser window.
@@ -62,7 +68,7 @@ function setupIPC(): void {
   ipcMain.handle('tracker:start', async () => {
     try {
       console.log('IPC tracker:start called - someone is starting the tracker!')
-      await tracker.start()
+      await activityTracker.start()
       return { success: true }
     } catch (error) {
       console.error('Failed to start tracker:', error)
@@ -72,7 +78,7 @@ function setupIPC(): void {
 
   ipcMain.handle('tracker:stop', () => {
     try {
-      tracker.stop()
+      activityTracker.stop()
       return { success: true }
     } catch (error) {
       console.error('Failed to stop tracker:', error)
@@ -81,18 +87,18 @@ function setupIPC(): void {
   })
 
   ipcMain.handle('tracker:status', () => {
-    const status = tracker.getStatus()
+    const status = activityTracker.getStatus()
     console.log('IPC tracker:status called, returning:', status)
     return status
   })
 
   ipcMain.handle('tracker:config:get', () => {
-    return tracker.getConfig()
+    return activityTracker.getConfig()
   })
 
   ipcMain.handle('tracker:config:update', async (_, config: Partial<TrackerConfig>) => {
     try {
-      await tracker.updateConfig(config)
+      await activityTracker.updateConfig(config)
       return { success: true }
     } catch (error) {
       console.error('Failed to update config:', error)
@@ -103,7 +109,7 @@ function setupIPC(): void {
   // Dashboard data
   ipcMain.handle('dashboard:get-data', async (): Promise<DashboardData> => {
     try {
-      return await database.getDashboardData()
+      return await databaseManager.getDashboardData()
     } catch (error) {
       console.error('Failed to get dashboard data:', error)
       throw error
@@ -113,7 +119,7 @@ function setupIPC(): void {
   // Activity log data
   ipcMain.handle('activity:get-activities', async (_, filters?: any) => {
     try {
-      return await database.getActivities(filters)
+      return await databaseManager.getActivities(filters)
     } catch (error) {
       console.error('Failed to get activities:', error)
       throw error
@@ -141,22 +147,197 @@ function setupIPC(): void {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   })
+
+  // App Categories Management
+  ipcMain.handle('app-categories:get-all', async () => {
+    try {
+      return await databaseManager.getAppCategories()
+    } catch (error) {
+      console.error('Failed to get app categories:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('app-categories:save', async (_, category) => {
+    try {
+      return await databaseManager.saveAppCategory(category)
+    } catch (error) {
+      console.error('Failed to save app category:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('app-categories:delete', async (_, appName: string) => {
+    try {
+      return await databaseManager.deleteAppCategory(appName)
+    } catch (error) {
+      console.error('Failed to delete app category:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('app-categories:get-suggestions', async () => {
+      try {
+        const uncategorizedApps = await appCategorizer.getUncategorizedApps()
+        return await appCategorizer.getSuggestions(uncategorizedApps)
+      } catch (error) {
+        console.error('Failed to get categorization suggestions:', error)
+        throw error
+      }
+    })
+
+  ipcMain.handle('app-categories:apply-suggestions', async (_, suggestions) => {
+      try {
+        for (const suggestion of suggestions) {
+          await databaseManager.saveAppCategory({
+            appName: suggestion.appName,
+            category: suggestion.category,
+            productivityRating: suggestion.productivityRating,
+            isManual: false
+          })
+        }
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to apply categorization suggestions:', error)
+        throw error
+      }
+    })
+
+  // Distraction Management
+  ipcMain.handle('distraction:get-settings', async () => {
+      try {
+        return distractionDetector.getSettings()
+      } catch (error) {
+        console.error('Failed to get distraction settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('distraction:save-settings', async (_, settings) => {
+      try {
+        await distractionDetector.updateSettings(settings)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to save distraction settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('distraction:get-events', async (_, filters) => {
+      try {
+        return await distractionDetector.getDistractionEvents(filters)
+      } catch (error) {
+        console.error('Failed to get distraction events:', error)
+        throw error
+      }
+    })
+
+  // Focus Session Management
+  ipcMain.handle('focus-session:start', async (_, sessionConfig) => {
+      try {
+        return await focusManager.startFocusSession(sessionConfig)
+      } catch (error) {
+        console.error('Failed to start focus session:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:stop', async () => {
+      try {
+        return await focusManager.stopFocusSession()
+      } catch (error) {
+        console.error('Failed to stop focus session:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:get-current', async () => {
+      try {
+        return focusManager.getCurrentSession()
+      } catch (error) {
+        console.error('Failed to get current focus session:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:get-history', async (_, filters) => {
+      try {
+        return await focusManager.getSessionHistory(filters?.limit || 20)
+      } catch (error) {
+        console.error('Failed to get focus session history:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:get-analytics', async () => {
+      try {
+        return await focusManager.getSessionAnalytics()
+      } catch (error) {
+        console.error('Failed to get focus session analytics:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:get-settings', async () => {
+      try {
+        return focusManager.getConfig()
+      } catch (error) {
+        console.error('Failed to get focus session settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:save-settings', async (_, settings) => {
+      try {
+        await focusManager.updateConfig(settings)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to save focus session settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('focus-session:record-interruption', async (_, interruption) => {
+      try {
+        return await focusManager.recordInterruption(interruption)
+      } catch (error) {
+        console.error('Failed to record interruption:', error)
+        throw error
+      }
+    })
 }
 
 // Initialize the application
 async function initializeApp(): Promise<void> {
   try {
     // Initialize database
-    database = new DatabaseManager()
-    await database.initialize()
+    databaseManager = new DatabaseManager()
+    await databaseManager.initialize()
     console.log('Database initialized successfully')
 
     // Initialize activity tracker
-    tracker = new ActivityTracker(database)
+    activityTracker = new ActivityTracker(databaseManager)
     console.log('Activity tracker initialized successfully')
+
+    // Initialize focus manager
+    focusManager = new FocusManager(databaseManager)
+    
+    // Initialize distraction detector
+    distractionDetector = new DistractionDetector(databaseManager)
+    await distractionDetector.initialize()
+    
+    // Initialize app categorizer
+    appCategorizer = new AppCategorizer(databaseManager)
+    
+    // Connect distraction detector to activity tracker
+    activityTracker.on('activity-recorded', (activity) => {
+      distractionDetector.onActivityChange(activity)
+    })
 
     // Setup IPC communication
     setupIPC()
+    
+    console.log('Application initialized successfully')
   } catch (error) {
     console.error('Failed to initialize app:', error)
     app.quit()
@@ -196,13 +377,13 @@ app.whenReady().then(async () => {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   // Stop tracking when app is closing
-  if (tracker) {
-    tracker.stop()
+  if (activityTracker) {
+    activityTracker.stop()
   }
 
   // Close database connection
-  if (database) {
-    database.close()
+  if (databaseManager) {
+    databaseManager.close()
   }
 
   if (process.platform !== 'darwin') {
@@ -212,10 +393,10 @@ app.on('window-all-closed', () => {
 
 // Handle app termination gracefully
 app.on('before-quit', () => {
-  if (tracker) {
-    tracker.stop()
+  if (activityTracker) {
+    activityTracker.stop()
   }
-  if (database) {
-    database.close()
+  if (databaseManager) {
+    databaseManager.close()
   }
 })

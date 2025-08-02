@@ -5,6 +5,7 @@ import * as schedule from 'node-schedule'
 import { join } from 'path'
 import { app } from 'electron'
 import { writeFileSync, existsSync, mkdirSync } from 'fs'
+import { EventEmitter } from 'events'
 import { ActivityRecord, TrackerConfig, ScreenshotRecord } from './types'
 import { DatabaseManager } from './database'
 import { ProductivityAnalytics } from './analytics'
@@ -13,7 +14,7 @@ import { SystemResourceMonitor } from './monitor'
 import { RealTimeProductivityCalculator } from './productivity'
 import { AdvancedFocusDetector } from './focus'
 
-export class ActivityTracker {
+export class ActivityTracker extends EventEmitter {
   private isRunning = false
   private currentActivity: ActivityRecord | null = null
   private intervalId: NodeJS.Timeout | null = null
@@ -49,6 +50,7 @@ export class ActivityTracker {
   }
 
   constructor(private db: DatabaseManager) {
+    super()
     const userDataPath = app.getPath('userData')
     this.screenshotsDir = join(userDataPath, 'screenshots')
 
@@ -353,6 +355,9 @@ export class ActivityTracker {
       // Save previous activity if it exists
       if (this.currentActivity && this.currentActivity.duration > 0) {
         await this.db.saveActivity(this.currentActivity)
+        
+        // Emit event for other components
+        this.emit('activity-recorded', this.currentActivity)
         
         // Add to session manager
         this.sessionManager.addActivity(this.currentActivity)

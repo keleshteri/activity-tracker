@@ -292,3 +292,7 @@ export class ProductivityAnalytics implements AnalyticsEngine {
     return hoursTracked > 0 ? boundaries.length / hoursTracked : 0
   }
 }
+
+// Export new modules
+export * from '../insights'
+export * from '../patterns'

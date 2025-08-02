@@ -3,6 +3,9 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import Dashboard from './components/Dashboard.vue'
 import Settings from './components/Settings.vue'
 import ActivityLog from './components/ActivityLog.vue'
+import AppCategorization from '../components/AppCategorization.vue'
+import DistractionManagement from '../components/DistractionManagement.vue'
+import FocusSession from '../components/FocusSession.vue'
 
 const activeTab = ref('dashboard')
 const isTracking = ref(false)
@@ -12,6 +15,9 @@ const statusInterval = ref<NodeJS.Timeout | null>(null)
 const tabs = [
   { id: 'dashboard', name: 'Dashboard', icon: '📊' },
   { id: 'activity', name: 'Activity Log', icon: '📝' },
+  { id: 'focus', name: 'Focus Sessions', icon: '🎯' },
+  { id: 'distraction', name: 'Distraction Management', icon: '🚫' },
+  { id: 'categorization', name: 'App Categories', icon: '📂' },
   { id: 'settings', name: 'Settings', icon: '⚙️' }
 ]
 
@@ -112,6 +118,9 @@ onUnmounted(() => {
     <main class="app-main">
       <Dashboard v-if="activeTab === 'dashboard'" />
       <ActivityLog v-if="activeTab === 'activity'" />
+      <FocusSession v-if="activeTab === 'focus'" />
+      <DistractionManagement v-if="activeTab === 'distraction'" />
+      <AppCategorization v-if="activeTab === 'categorization'" />
       <Settings v-if="activeTab === 'settings'" />
     </main>
   </div>

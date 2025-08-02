@@ -18,7 +18,9 @@ import {
   EnhancedDashboardData,
   WorkPattern,
   ProductivityBlock,
-  Insight
+  Insight,
+  DistractionSettings,
+  DistractionEvent
 } from './types'
 
 export class DatabaseManager {
@@ -281,6 +283,39 @@ export class DatabaseManager {
       )
     `
 
+    const createDistractionSettingsTable = `
+      CREATE TABLE IF NOT EXISTS distraction_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled BOOLEAN DEFAULT 1,
+        threshold_minutes INTEGER DEFAULT 5,
+        notification_type TEXT CHECK(notification_type IN ('gentle', 'standard', 'persistent')) DEFAULT 'gentle',
+        notification_frequency INTEGER DEFAULT 15,
+        quiet_hours_enabled BOOLEAN DEFAULT 0,
+        quiet_hours_start TEXT,
+        quiet_hours_end TEXT,
+        excluded_apps TEXT,
+        break_reminder_enabled BOOLEAN DEFAULT 1,
+        break_reminder_interval INTEGER DEFAULT 30,
+        focus_mode_enabled BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    const createDistractionEventsTable = `
+      CREATE TABLE IF NOT EXISTS distraction_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        app_name TEXT NOT NULL,
+        duration INTEGER NOT NULL,
+        severity TEXT CHECK(severity IN ('low', 'medium', 'high')) DEFAULT 'medium',
+        notification_sent BOOLEAN DEFAULT 0,
+        user_acknowledged BOOLEAN DEFAULT 0,
+        context TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
     const createIndexes = `
       CREATE INDEX IF NOT EXISTS idx_activities_timestamp ON activities(timestamp);
       CREATE INDEX IF NOT EXISTS idx_activities_app_name ON activities(app_name);
@@ -300,6 +335,8 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
       CREATE INDEX IF NOT EXISTS idx_insights_timestamp ON insights(timestamp);
       CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key);
+      CREATE INDEX IF NOT EXISTS idx_distraction_events_timestamp ON distraction_events(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_distraction_events_app_name ON distraction_events(app_name);
     `
 
     return new Promise((resolve, reject) => {
@@ -329,6 +366,8 @@ export class DatabaseManager {
         this.db!.run(createProductivityBlocksTable)
         this.db!.run(createInsightsTable)
         this.db!.run(createUserPreferencesTable)
+        this.db!.run(createDistractionSettingsTable)
+        this.db!.run(createDistractionEventsTable)
         this.db!.run(createIndexes, (err) => {
           if (err) reject(err)
           else resolve()
@@ -1077,6 +1116,21 @@ export class DatabaseManager {
     })
   }
 
+  async deleteAppCategory(appName: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        'DELETE FROM app_categories WHERE app_name = ?',
+        [appName],
+        (err) => {
+          if (err) reject(err)
+          else resolve()
+        }
+      )
+    })
+  }
+
   // Productivity Metrics
   async saveProductivityMetrics(metrics: ProductivityMetrics): Promise<void> {
     if (!this.db) throw new Error('Database not initialized')
@@ -1708,6 +1762,244 @@ export class DatabaseManager {
         distractionTrend: 'stable'
       }
     }
+  }
+
+  // Distraction Management
+  async saveDistractionSettings(settings: DistractionSettings): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const stmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO distraction_settings 
+        (id, enable_distraction_detection, distraction_threshold, context_switch_threshold, 
+         enable_notifications, notification_style, quiet_hours_enabled, quiet_hours_start, 
+         quiet_hours_end, blocked_apps, allowed_break_apps, focus_session_reminders, 
+         break_reminders, created_at, updated_at)
+        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      const now = Date.now()
+      stmt.run(
+        [
+          settings.enableDistractionDetection ? 1 : 0,
+          settings.distractionThreshold,
+          settings.contextSwitchThreshold,
+          settings.enableNotifications ? 1 : 0,
+          settings.notificationStyle,
+          settings.quietHours.enabled ? 1 : 0,
+          settings.quietHours.start,
+          settings.quietHours.end,
+          JSON.stringify(settings.blockedApps),
+          JSON.stringify(settings.allowedBreakApps),
+          settings.focusSessionReminders ? 1 : 0,
+          settings.breakReminders ? 1 : 0,
+          settings.createdAt || now,
+          now
+        ],
+        (err) => {
+          if (err) reject(err)
+          else resolve()
+        }
+      )
+
+      stmt.finalize()
+    })
+  }
+
+  async getDistractionSettings(): Promise<DistractionSettings | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        `
+        SELECT * FROM distraction_settings WHERE id = 1
+      `,
+        (err, row: any) => {
+          if (err) reject(err)
+          else if (!row) {
+            // Return default settings if none exist
+            resolve({
+              enableDistractionDetection: true,
+              distractionThreshold: 15,
+              contextSwitchThreshold: 20,
+              enableNotifications: true,
+              notificationStyle: 'gentle',
+              quietHours: {
+                enabled: false,
+                start: '22:00',
+                end: '08:00'
+              },
+              blockedApps: [],
+              allowedBreakApps: [],
+              focusSessionReminders: true,
+              breakReminders: true,
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            })
+          } else {
+            resolve({
+              id: row.id,
+              enableDistractionDetection: Boolean(row.enable_distraction_detection),
+              distractionThreshold: row.distraction_threshold,
+              contextSwitchThreshold: row.context_switch_threshold,
+              enableNotifications: Boolean(row.enable_notifications),
+              notificationStyle: row.notification_style,
+              quietHours: {
+                enabled: Boolean(row.quiet_hours_enabled),
+                start: row.quiet_hours_start,
+                end: row.quiet_hours_end
+              },
+              blockedApps: JSON.parse(row.blocked_apps || '[]'),
+              allowedBreakApps: JSON.parse(row.allowed_break_apps || '[]'),
+              focusSessionReminders: Boolean(row.focus_session_reminders),
+              breakReminders: Boolean(row.break_reminders),
+              createdAt: row.created_at,
+              updatedAt: row.updated_at
+            })
+          }
+        }
+      )
+    })
+  }
+
+  async saveDistractionEvent(event: DistractionEvent): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const stmt = this.db!.prepare(`
+        INSERT INTO distraction_events 
+        (timestamp, type, app_name, duration, severity, context_switches, was_notified, user_response)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      stmt.run(
+        [
+          event.timestamp,
+          event.type,
+          event.appName,
+          event.duration,
+          event.severity,
+          event.contextSwitches,
+          event.wasNotified ? 1 : 0,
+          event.userResponse || null
+        ],
+        function (err) {
+          if (err) reject(err)
+          else resolve(this.lastID)
+        }
+      )
+
+      stmt.finalize()
+    })
+  }
+
+  async getDistractionEvents(filters?: any): Promise<DistractionEvent[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    let query = 'SELECT * FROM distraction_events'
+    const params: any[] = []
+    const conditions: string[] = []
+
+    if (filters?.startTime) {
+      conditions.push('timestamp >= ?')
+      params.push(filters.startTime)
+    }
+
+    if (filters?.endTime) {
+      conditions.push('timestamp <= ?')
+      params.push(filters.endTime)
+    }
+
+    if (filters?.type) {
+      conditions.push('type = ?')
+      params.push(filters.type)
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+
+    query += ' ORDER BY timestamp DESC'
+
+    if (filters?.limit) {
+      query += ' LIMIT ?'
+      params.push(filters.limit)
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err)
+        else {
+          const events = rows.map((row) => ({
+            id: row.id,
+            timestamp: row.timestamp,
+            type: row.type,
+            appName: row.app_name,
+            duration: row.duration,
+            severity: row.severity,
+            contextSwitches: row.context_switches,
+            wasNotified: Boolean(row.was_notified),
+            userResponse: row.user_response
+          }))
+          resolve(events)
+        }
+      })
+    })
+  }
+
+  async getFocusSessions(filters?: any): Promise<FocusSession[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    let query = 'SELECT * FROM focus_sessions'
+    const params: any[] = []
+    const conditions: string[] = []
+
+    if (filters?.startTime) {
+      conditions.push('start_time >= ?')
+      params.push(filters.startTime)
+    }
+
+    if (filters?.endTime) {
+      conditions.push('end_time <= ?')
+      params.push(filters.endTime)
+    }
+
+    if (filters?.appName) {
+      conditions.push('app_name = ?')
+      params.push(filters.appName)
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+
+    query += ' ORDER BY start_time DESC'
+
+    if (filters?.limit) {
+      query += ' LIMIT ?'
+      params.push(filters.limit)
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err)
+        else {
+          const sessions = rows.map((row) => ({
+            id: row.id,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            duration: row.duration,
+            appName: row.app_name,
+            category: row.category,
+            interruptions: row.interruptions,
+            focusScore: row.focus_score,
+            keystrokes: row.keystrokes,
+            mouseClicks: row.mouse_clicks
+          }))
+          resolve(sessions)
+        }
+      })
+    })
   }
 
   close(): void {

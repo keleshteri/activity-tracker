@@ -237,3 +237,165 @@ export interface MigrationState {
   appliedMigrations: number[]
   lastMigrationAt: number
 }
+
+export interface Achievement {
+  id: string
+  type: 'productivity_milestone' | 'focus_improvement' | 'consistency' | 'efficiency' | 'work_life_balance'
+  title: string
+  description: string
+  timestamp: number
+  value: number
+  threshold: number
+  category: 'daily' | 'weekly' | 'monthly' | 'all_time'
+  badge?: string
+}
+
+export interface ProductivityWarning {
+  id: string
+  type: 'declining_productivity' | 'excessive_distraction' | 'burnout_risk' | 'poor_focus' | 'overwork'
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  title: string
+  description: string
+  timestamp: number
+  trend: 'increasing' | 'stable' | 'decreasing'
+  recommendations: string[]
+  threshold: number
+  currentValue: number
+}
+
+export interface WorkHabit {
+  id: string
+  type: 'app_usage' | 'time_preference' | 'break_timing' | 'focus_duration' | 'multitasking'
+  pattern: string
+  frequency: number
+  confidence: number
+  description: string
+  impact: 'positive' | 'negative' | 'neutral'
+  recommendation?: string
+  detectedAt: number
+}
+
+export interface ProductivityCycle {
+  id: string
+  startHour: number
+  endHour: number
+  type: 'peak' | 'moderate' | 'low'
+  averageProductivity: number
+  consistency: number
+  daysObserved: number
+  confidence: number
+}
+
+export interface ContextSwitchPattern {
+  id: string
+  fromApp: string
+  toApp: string
+  frequency: number
+  averageDuration: number
+  timeOfDay: number[]
+  impact: 'disruptive' | 'neutral' | 'beneficial'
+  pattern: 'habitual' | 'reactive' | 'planned'
+}
+
+export interface ProductivityTrend {
+  date: string
+  productivityScore: number
+  focusScore: number
+  totalActiveTime: number
+  contextSwitches: number
+  breakFrequency: number
+}
+
+export interface ProductivityOptimization {
+  recommendations: string[]
+  optimalWorkHours: { start: number, end: number }
+  suggestedBreakInterval: number
+  focusImprovements: string[]
+  resourceOptimizations: string[]
+}
+
+// Distraction Management Types
+export interface DistractionSettings {
+  id?: number
+  enableDistractionDetection: boolean
+  distractionThreshold: number // minutes of distracting app usage before alert
+  contextSwitchThreshold: number // number of switches per hour before alert
+  enableNotifications: boolean
+  notificationStyle: 'gentle' | 'standard' | 'persistent'
+  quietHours: {
+    enabled: boolean
+    start: string // HH:MM format
+    end: string // HH:MM format
+  }
+  blockedApps: string[]
+  allowedBreakApps: string[]
+  focusSessionReminders: boolean
+  breakReminders: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface DistractionEvent {
+  id?: number
+  timestamp: number
+  type: 'app_distraction' | 'excessive_switching' | 'break_overrun' | 'focus_loss'
+  appName: string
+  duration: number
+  severity: 'low' | 'medium' | 'high'
+  contextSwitches: number
+  wasNotified: boolean
+  userResponse?: 'dismissed' | 'acknowledged' | 'blocked_app'
+}
+
+// Focus Session Management Types
+export interface FocusSessionConfig {
+  duration: number // minutes
+  type: 'pomodoro' | 'deep_focus' | 'custom'
+  breakDuration?: number // minutes
+  longBreakDuration?: number // minutes
+  sessionsUntilLongBreak?: number
+  allowedApps?: string[]
+  blockedApps?: string[]
+  enableNotifications: boolean
+  enableSounds: boolean
+  autoStartBreaks: boolean
+  strictMode: boolean // blocks all non-allowed apps
+}
+
+export interface ActiveFocusSession {
+  id: string
+  config: FocusSessionConfig
+  startTime: number
+  plannedEndTime: number
+  currentPhase: 'focus' | 'break' | 'long_break'
+  phaseStartTime: number
+  sessionsCompleted: number
+  isPaused: boolean
+  pausedAt?: number
+  totalPausedTime: number
+  interruptions: number
+  focusScore: number
+}
+
+export interface FocusSessionAnalytics {
+  totalSessions: number
+  totalFocusTime: number
+  averageSessionDuration: number
+  completionRate: number
+  averageFocusScore: number
+  mostProductiveHours: number[]
+  commonInterruptions: string[]
+  weeklyTrend: 'improving' | 'declining' | 'stable'
+  streakDays: number
+  bestStreak: number
+}
+
+// App Categorization Suggestions
+export interface AppCategorizationSuggestion {
+  appName: string
+  suggestedCategory: string
+  suggestedProductivityRating: ProductivityRating
+  confidence: number
+  reason: string
+  isCommonApp: boolean
+}
