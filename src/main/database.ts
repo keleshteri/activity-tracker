@@ -12,12 +12,19 @@ import {
   FocusSession,
   PrivacySettings,
   SystemMetrics,
-  ProductivityInsight
+  ProductivityInsight,
+  DatabaseMigration,
+  MigrationState,
+  EnhancedDashboardData,
+  WorkPattern,
+  ProductivityBlock,
+  Insight
 } from './types'
 
 export class DatabaseManager {
   private db: sqlite3.Database | null = null
   private dbPath: string
+  private readonly CURRENT_VERSION = 2
 
   constructor() {
     const userDataPath = app.getPath('userData')
@@ -26,13 +33,20 @@ export class DatabaseManager {
 
   async initialize(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.db = new sqlite3.Database(this.dbPath, (err) => {
+      this.db = new sqlite3.Database(this.dbPath, async (err) => {
         if (err) {
           reject(err)
           return
         }
 
-        this.createTables().then(resolve).catch(reject)
+        try {
+          await this.createMigrationTables()
+          await this.runMigrations()
+          await this.createTables()
+          resolve()
+        } catch (error) {
+          reject(error)
+        }
       })
     })
   }
@@ -199,6 +213,74 @@ export class DatabaseManager {
       )
     `
 
+    const createWorkPatternsTable = `
+      CREATE TABLE IF NOT EXISTS work_patterns (
+        id TEXT PRIMARY KEY,
+        type TEXT CHECK(type IN ('daily', 'weekly', 'monthly')),
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        frequency INTEGER NOT NULL,
+        time_of_day_start INTEGER,
+        time_of_day_end INTEGER,
+        day_of_week TEXT, -- JSON array
+        associated_apps TEXT, -- JSON array
+        productivity_impact TEXT CHECK(productivity_impact IN ('positive', 'negative', 'neutral')),
+        detected_at INTEGER NOT NULL,
+        last_seen INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    const createProductivityBlocksTable = `
+      CREATE TABLE IF NOT EXISTS productivity_blocks (
+        id TEXT PRIMARY KEY,
+        start_time INTEGER NOT NULL,
+        end_time INTEGER NOT NULL,
+        duration INTEGER NOT NULL,
+        type TEXT CHECK(type IN ('deep_focus', 'shallow_work', 'break', 'distraction')),
+        focus_score REAL NOT NULL,
+        dominant_activity TEXT NOT NULL,
+        interruptions INTEGER DEFAULT 0,
+        context_switches INTEGER DEFAULT 0,
+        productivity_rating TEXT CHECK(productivity_rating IN ('productive', 'neutral', 'distracting')),
+        energy_level TEXT CHECK(energy_level IN ('high', 'medium', 'low')),
+        quality_score INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    const createInsightsTable = `
+      CREATE TABLE IF NOT EXISTS insights (
+        id TEXT PRIMARY KEY,
+        category TEXT CHECK(category IN ('productivity', 'focus', 'patterns', 'health', 'optimization')),
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        actionable BOOLEAN DEFAULT 1,
+        priority TEXT CHECK(priority IN ('low', 'medium', 'high', 'critical')),
+        confidence REAL NOT NULL,
+        impact TEXT CHECK(impact IN ('low', 'medium', 'high')),
+        timeframe TEXT CHECK(timeframe IN ('immediate', 'short_term', 'long_term')),
+        data TEXT, -- JSON data
+        timestamp INTEGER NOT NULL,
+        expires_at INTEGER,
+        is_dismissed BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    const createUserPreferencesTable = `
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL UNIQUE,
+        value TEXT NOT NULL,
+        type TEXT CHECK(type IN ('string', 'number', 'boolean', 'json')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
     const createIndexes = `
       CREATE INDEX IF NOT EXISTS idx_activities_timestamp ON activities(timestamp);
       CREATE INDEX IF NOT EXISTS idx_activities_app_name ON activities(app_name);
@@ -211,6 +293,13 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_system_metrics_timestamp ON system_metrics(timestamp);
       CREATE INDEX IF NOT EXISTS idx_insights_type ON productivity_insights(type);
       CREATE INDEX IF NOT EXISTS idx_insights_priority ON productivity_insights(priority);
+      CREATE INDEX IF NOT EXISTS idx_work_patterns_type ON work_patterns(type);
+      CREATE INDEX IF NOT EXISTS idx_work_patterns_detected_at ON work_patterns(detected_at);
+      CREATE INDEX IF NOT EXISTS idx_productivity_blocks_start_time ON productivity_blocks(start_time);
+      CREATE INDEX IF NOT EXISTS idx_productivity_blocks_type ON productivity_blocks(type);
+      CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
+      CREATE INDEX IF NOT EXISTS idx_insights_timestamp ON insights(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key);
     `
 
     return new Promise((resolve, reject) => {
@@ -236,11 +325,240 @@ export class DatabaseManager {
         this.db!.run(createPrivacySettingsTable)
         this.db!.run(createSystemMetricsTable)
         this.db!.run(createProductivityInsightsTable)
+        this.db!.run(createWorkPatternsTable)
+        this.db!.run(createProductivityBlocksTable)
+        this.db!.run(createInsightsTable)
+        this.db!.run(createUserPreferencesTable)
         this.db!.run(createIndexes, (err) => {
           if (err) reject(err)
           else resolve()
         })
       })
+    })
+  }
+
+  private async createMigrationTables(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const createMigrationsTable = `
+      CREATE TABLE IF NOT EXISTS migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        applied_at INTEGER NOT NULL,
+        checksum TEXT NOT NULL
+      )
+    `
+
+    const createMigrationStateTable = `
+      CREATE TABLE IF NOT EXISTS migration_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        current_version INTEGER NOT NULL DEFAULT 0,
+        last_migration_at INTEGER NOT NULL DEFAULT 0
+      )
+    `
+
+    return new Promise((resolve, reject) => {
+      this.db!.serialize(() => {
+        this.db!.run(createMigrationsTable)
+        this.db!.run(createMigrationStateTable)
+        
+        // Initialize migration state if it doesn't exist
+        this.db!.run(
+          'INSERT OR IGNORE INTO migration_state (id, current_version, last_migration_at) VALUES (1, 0, 0)',
+          (err) => {
+            if (err) reject(err)
+            else resolve()
+          }
+        )
+      })
+    })
+  }
+
+  private async runMigrations(): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const currentVersion = await this.getCurrentMigrationVersion()
+    const migrations = this.getMigrations()
+
+    for (const migration of migrations) {
+      if (migration.version > currentVersion) {
+        await this.applyMigration(migration)
+      }
+    }
+  }
+
+  private async getCurrentMigrationVersion(): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        'SELECT current_version FROM migration_state WHERE id = 1',
+        (err, row: any) => {
+          if (err) reject(err)
+          else resolve(row?.current_version || 0)
+        }
+      )
+    })
+  }
+
+  private getMigrations(): DatabaseMigration[] {
+    return [
+      {
+        version: 1,
+        name: 'initial_enhanced_schema',
+        description: 'Add enhanced productivity tracking fields to activities table',
+        up: [
+          'ALTER TABLE activities ADD COLUMN memory_usage REAL',
+          'ALTER TABLE activities ADD COLUMN focus_score REAL',
+          "ALTER TABLE activities ADD COLUMN productivity_rating TEXT CHECK(productivity_rating IN ('productive', 'neutral', 'distracting'))",
+          'ALTER TABLE activities ADD COLUMN context_switches INTEGER DEFAULT 0',
+          'ALTER TABLE activities ADD COLUMN keystrokes INTEGER DEFAULT 0',
+          'ALTER TABLE activities ADD COLUMN mouse_clicks INTEGER DEFAULT 0'
+        ],
+        down: [
+          'ALTER TABLE activities DROP COLUMN memory_usage',
+          'ALTER TABLE activities DROP COLUMN focus_score',
+          'ALTER TABLE activities DROP COLUMN productivity_rating',
+          'ALTER TABLE activities DROP COLUMN context_switches',
+          'ALTER TABLE activities DROP COLUMN keystrokes',
+          'ALTER TABLE activities DROP COLUMN mouse_clicks'
+        ],
+        timestamp: Date.now()
+      },
+      {
+        version: 2,
+        name: 'analytics_tables',
+        description: 'Add analytics and pattern detection tables',
+        up: [
+          // These tables are created in createTables method
+          'SELECT 1' // Placeholder - actual table creation handled in createTables
+        ],
+        down: [
+          'DROP TABLE IF EXISTS work_patterns',
+          'DROP TABLE IF EXISTS productivity_blocks',
+          'DROP TABLE IF EXISTS insights',
+          'DROP TABLE IF EXISTS user_preferences'
+        ],
+        timestamp: Date.now()
+      }
+    ]
+  }
+
+  private async applyMigration(migration: DatabaseMigration): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.serialize(() => {
+        this.db!.run('BEGIN TRANSACTION')
+
+        let completed = 0
+        const total = migration.up.length
+
+        if (total === 0) {
+          this.completeMigration(migration, resolve, reject)
+          return
+        }
+
+        migration.up.forEach((sql) => {
+          this.db!.run(sql, (err) => {
+            if (err && !err.message.includes('duplicate column name')) {
+              this.db!.run('ROLLBACK')
+              reject(new Error(`Migration ${migration.version} failed: ${err.message}`))
+              return
+            }
+
+            completed++
+            if (completed === total) {
+              this.completeMigration(migration, resolve, reject)
+            }
+          })
+        })
+      })
+    })
+  }
+
+  private completeMigration(
+    migration: DatabaseMigration,
+    resolve: () => void,
+    reject: (error: Error) => void
+  ): void {
+    if (!this.db) {
+      reject(new Error('Database not initialized'))
+      return
+    }
+
+    const checksum = this.calculateMigrationChecksum(migration)
+    const now = Date.now()
+
+    this.db.run(
+      'INSERT INTO migrations (version, name, description, applied_at, checksum) VALUES (?, ?, ?, ?, ?)',
+      [migration.version, migration.name, migration.description, now, checksum],
+      (err) => {
+        if (err) {
+          this.db!.run('ROLLBACK')
+          reject(err)
+          return
+        }
+
+        this.db!.run(
+          'UPDATE migration_state SET current_version = ?, last_migration_at = ? WHERE id = 1',
+          [migration.version, now],
+          (err) => {
+            if (err) {
+              this.db!.run('ROLLBACK')
+              reject(err)
+              return
+            }
+
+            this.db!.run('COMMIT', (err) => {
+              if (err) reject(err)
+              else {
+                console.log(`Applied migration ${migration.version}: ${migration.name}`)
+                resolve()
+              }
+            })
+          }
+        )
+      }
+    )
+  }
+
+  private calculateMigrationChecksum(migration: DatabaseMigration): string {
+    const content = migration.up.join('') + migration.down.join('')
+    // Simple checksum - in production, use a proper hash function
+    return Buffer.from(content).toString('base64').slice(0, 32)
+  }
+
+  async getMigrationState(): Promise<MigrationState> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        'SELECT current_version, last_migration_at FROM migration_state WHERE id = 1',
+        (err, row: any) => {
+          if (err) {
+            reject(err)
+            return
+          }
+
+          this.db!.all(
+            'SELECT version FROM migrations ORDER BY version',
+            (err, migrations: any[]) => {
+              if (err) {
+                reject(err)
+                return
+              }
+
+              resolve({
+                currentVersion: row?.current_version || 0,
+                appliedMigrations: migrations.map(m => m.version),
+                lastMigrationAt: row?.last_migration_at || 0
+              })
+            }
+          )
+        }
+      )
     })
   }
 
@@ -1010,6 +1328,386 @@ export class DatabaseManager {
         }
       )
     })
+  }
+
+  // Work Patterns Analytics
+  async saveWorkPattern(pattern: WorkPattern): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const stmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO work_patterns 
+        (id, type, name, description, confidence, frequency, time_of_day_start, time_of_day_end, 
+         day_of_week, associated_apps, productivity_impact, detected_at, last_seen)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      stmt.run(
+        [
+          pattern.id,
+          pattern.type,
+          pattern.name,
+          pattern.description,
+          pattern.confidence,
+          pattern.frequency,
+          pattern.timeOfDay?.start,
+          pattern.timeOfDay?.end,
+          JSON.stringify(pattern.dayOfWeek || []),
+          JSON.stringify(pattern.associatedApps),
+          pattern.productivityImpact,
+          pattern.detectedAt,
+          pattern.lastSeen
+        ],
+        function (err) {
+          if (err) reject(err)
+          else resolve()
+        }
+      )
+
+      stmt.finalize()
+    })
+  }
+
+  async getWorkPatterns(type?: string): Promise<WorkPattern[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    let query = `
+      SELECT id, type, name, description, confidence, frequency, 
+             time_of_day_start, time_of_day_end, day_of_week, associated_apps,
+             productivity_impact, detected_at, last_seen
+      FROM work_patterns
+    `
+    const params: any[] = []
+
+    if (type) {
+      query += ' WHERE type = ?'
+      params.push(type)
+    }
+
+    query += ' ORDER BY confidence DESC, last_seen DESC'
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err)
+        else {
+          const patterns = rows.map((row) => ({
+            id: row.id,
+            type: row.type,
+            name: row.name,
+            description: row.description,
+            confidence: row.confidence,
+            frequency: row.frequency,
+            timeOfDay: row.time_of_day_start && row.time_of_day_end ? {
+              start: row.time_of_day_start,
+              end: row.time_of_day_end
+            } : undefined,
+            dayOfWeek: JSON.parse(row.day_of_week || '[]'),
+            associatedApps: JSON.parse(row.associated_apps || '[]'),
+            productivityImpact: row.productivity_impact,
+            detectedAt: row.detected_at,
+            lastSeen: row.last_seen
+          }))
+          resolve(patterns)
+        }
+      })
+    })
+  }
+
+  // Productivity Blocks Analytics
+  async saveProductivityBlock(block: ProductivityBlock): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const stmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO productivity_blocks 
+        (id, start_time, end_time, duration, type, focus_score, dominant_activity, 
+         interruptions, context_switches, productivity_rating, energy_level, quality_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      stmt.run(
+        [
+          block.id,
+          block.startTime,
+          block.endTime,
+          block.duration,
+          block.type,
+          block.focusScore,
+          block.dominantActivity,
+          block.interruptions,
+          block.contextSwitches,
+          block.productivityRating,
+          block.energyLevel,
+          block.qualityScore
+        ],
+        function (err) {
+          if (err) reject(err)
+          else resolve()
+        }
+      )
+
+      stmt.finalize()
+    })
+  }
+
+  async getProductivityBlocks(startTime?: number, endTime?: number): Promise<ProductivityBlock[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    let query = `
+      SELECT id, start_time, end_time, duration, type, focus_score, dominant_activity,
+             interruptions, context_switches, productivity_rating, energy_level, quality_score
+      FROM productivity_blocks
+    `
+    const params: any[] = []
+    const conditions: string[] = []
+
+    if (startTime) {
+      conditions.push('start_time >= ?')
+      params.push(startTime)
+    }
+
+    if (endTime) {
+      conditions.push('end_time <= ?')
+      params.push(endTime)
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+
+    query += ' ORDER BY start_time DESC'
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err)
+        else {
+          const blocks = rows.map((row) => ({
+            id: row.id,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            duration: row.duration,
+            type: row.type,
+            focusScore: row.focus_score,
+            dominantActivity: row.dominant_activity,
+            interruptions: row.interruptions,
+            contextSwitches: row.context_switches,
+            productivityRating: row.productivity_rating,
+            energyLevel: row.energy_level,
+            qualityScore: row.quality_score
+          }))
+          resolve(blocks)
+        }
+      })
+    })
+  }
+
+  // Enhanced Insights
+  async saveInsight(insight: Insight): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const stmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO insights 
+        (id, category, type, title, description, actionable, priority, confidence, 
+         impact, timeframe, data, timestamp, expires_at, is_dismissed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      stmt.run(
+        [
+          insight.id,
+          insight.category,
+          insight.type,
+          insight.title,
+          insight.description,
+          insight.actionable,
+          insight.priority,
+          insight.confidence,
+          insight.impact,
+          insight.timeframe,
+          JSON.stringify(insight.data),
+          insight.timestamp,
+          insight.expiresAt,
+          insight.isDismissed
+        ],
+        function (err) {
+          if (err) reject(err)
+          else resolve()
+        }
+      )
+
+      stmt.finalize()
+    })
+  }
+
+  async getInsights(category?: string, limit: number = 20): Promise<Insight[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    let query = `
+      SELECT id, category, type, title, description, actionable, priority, confidence,
+             impact, timeframe, data, timestamp, expires_at, is_dismissed
+      FROM insights
+      WHERE is_dismissed = 0
+    `
+    const params: any[] = []
+
+    if (category) {
+      query += ' AND category = ?'
+      params.push(category)
+    }
+
+    query += ' AND (expires_at IS NULL OR expires_at > ?)'
+    params.push(Date.now())
+
+    query += ' ORDER BY priority DESC, confidence DESC, timestamp DESC LIMIT ?'
+    params.push(limit)
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err)
+        else {
+          const insights = rows.map((row) => ({
+            id: row.id,
+            category: row.category,
+            type: row.type,
+            title: row.title,
+            description: row.description,
+            actionable: Boolean(row.actionable),
+            priority: row.priority,
+            confidence: row.confidence,
+            impact: row.impact,
+            timeframe: row.timeframe,
+            data: JSON.parse(row.data || '{}'),
+            timestamp: row.timestamp,
+            expiresAt: row.expires_at,
+            isDismissed: Boolean(row.is_dismissed)
+          }))
+          resolve(insights)
+        }
+      })
+    })
+  }
+
+  // User Preferences
+  async saveUserPreference(key: string, value: any, type: 'string' | 'number' | 'boolean' | 'json' = 'string'): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const serializedValue = type === 'json' ? JSON.stringify(value) : String(value)
+
+    return new Promise((resolve, reject) => {
+      const stmt = this.db!.prepare(`
+        INSERT OR REPLACE INTO user_preferences (key, value, type, updated_at)
+        VALUES (?, ?, ?, ?)
+      `)
+
+      stmt.run([key, serializedValue, type, Date.now()], function (err) {
+        if (err) reject(err)
+        else resolve()
+      })
+
+      stmt.finalize()
+    })
+  }
+
+  async getUserPreference(key: string): Promise<any> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        'SELECT value, type FROM user_preferences WHERE key = ?',
+        [key],
+        (err, row: any) => {
+          if (err) reject(err)
+          else if (!row) resolve(null)
+          else {
+            let value = row.value
+            switch (row.type) {
+              case 'number':
+                value = Number(value)
+                break
+              case 'boolean':
+                value = value === 'true'
+                break
+              case 'json':
+                value = JSON.parse(value)
+                break
+            }
+            resolve(value)
+          }
+        }
+      )
+    })
+  }
+
+  async getAllUserPreferences(): Promise<Record<string, any>> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(
+        'SELECT key, value, type FROM user_preferences',
+        (err, rows: any[]) => {
+          if (err) reject(err)
+          else {
+            const preferences: Record<string, any> = {}
+            rows.forEach((row) => {
+              let value = row.value
+              switch (row.type) {
+                case 'number':
+                  value = Number(value)
+                  break
+                case 'boolean':
+                  value = value === 'true'
+                  break
+                case 'json':
+                  value = JSON.parse(value)
+                  break
+              }
+              preferences[row.key] = value
+            })
+            resolve(preferences)
+          }
+        }
+      )
+    })
+  }
+
+  // Enhanced Dashboard Data
+  async getEnhancedDashboardData(): Promise<EnhancedDashboardData> {
+    const basicData = await this.getDashboardData()
+    const patterns = await this.getWorkPatterns()
+    const now = Date.now()
+    const startOfDay = new Date().setHours(0, 0, 0, 0)
+    const productivityBlocks = await this.getProductivityBlocks(startOfDay, now)
+    const recommendations = await this.getInsights('optimization', 5)
+
+    // Calculate weekly comparison
+    const currentWeekStart = startOfDay - (6 * 24 * 60 * 60 * 1000)
+    const previousWeekStart = currentWeekStart - (7 * 24 * 60 * 60 * 1000)
+    const previousWeekEnd = currentWeekStart
+
+    const currentWeekBlocks = await this.getProductivityBlocks(currentWeekStart, now)
+    const previousWeekBlocks = await this.getProductivityBlocks(previousWeekStart, previousWeekEnd)
+
+    const currentWeekTime = currentWeekBlocks.reduce((sum, block) => sum + block.duration, 0)
+    const previousWeekTime = previousWeekBlocks.reduce((sum, block) => sum + block.duration, 0)
+    const percentageChange = previousWeekTime > 0 ? ((currentWeekTime - previousWeekTime) / previousWeekTime) * 100 : 0
+
+    return {
+      ...basicData,
+      patterns,
+      productivityBlocks,
+      recommendations,
+      weeklyComparison: {
+        currentWeek: currentWeekTime,
+        previousWeek: previousWeekTime,
+        percentageChange
+      },
+      monthlyTrends: {
+        productivityTrend: 'stable', // TODO: Implement trend calculation
+        focusTrend: 'stable',
+        distractionTrend: 'stable'
+      }
+    }
   }
 
   close(): void {

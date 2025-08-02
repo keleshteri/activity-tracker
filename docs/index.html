@@ -3,194 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Activity Tracking - Desktop Activity Monitor</title>
+    <title>Activity Tracker - Database Documentation</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             line-height: 1.6;
             color: #333;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
         }
-        
-        header {
+
+        .header {
             text-align: center;
             margin-bottom: 3rem;
             color: white;
         }
-        
-        h1 {
+
+        .header h1 {
             font-size: 3rem;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
-        
-        .subtitle {
+
+        .header p {
             font-size: 1.2rem;
             opacity: 0.9;
-            margin-bottom: 2rem;
         }
-        
-        .main-content {
-            background: white;
-            border-radius: 15px;
-            padding: 3rem;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-        }
-        
-        .features {
+
+        .docs-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 2rem;
-            margin: 2rem 0;
+            margin-bottom: 3rem;
         }
-        
-        .feature {
-            padding: 1.5rem;
-            border-radius: 10px;
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
+
+        .doc-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.2);
         }
-        
-        .feature h3 {
-            color: #667eea;
+
+        .doc-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .doc-card h2 {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .doc-card .icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .doc-card p {
+            color: #666;
+            margin-bottom: 1.5rem;
+        }
+
+        .doc-card .features {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .doc-card .features li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+            color: #555;
+        }
+
+        .doc-card .features li:last-child {
+            border-bottom: none;
+        }
+
+        .doc-card .features li::before {
+            content: "✓";
+            color: #48bb78;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .overview {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .overview h2 {
+            color: #4a5568;
             margin-bottom: 1rem;
         }
-        
-        .download-section {
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat {
             text-align: center;
-            margin: 3rem 0;
+            padding: 1rem;
+            background: #f7fafc;
+            border-radius: 8px;
         }
-        
-        .download-btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 2rem;
-            text-decoration: none;
-            border-radius: 50px;
+
+        .stat-number {
+            font-size: 2rem;
             font-weight: bold;
-            font-size: 1.1rem;
-            transition: transform 0.3s ease;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            color: #667eea;
         }
-        
-        .download-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
         }
-        
-        .author {
+
+        .footer {
             text-align: center;
             color: white;
-            margin-top: 2rem;
+            opacity: 0.8;
+            margin-top: 3rem;
         }
-        
-        .github-link {
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        
-        .github-link:hover {
-            text-decoration: underline;
-        }
-        
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
             }
-            
-            h1 {
+
+            .header h1 {
                 font-size: 2rem;
             }
-            
-            .main-content {
-                padding: 2rem;
+
+            .docs-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Activity Tracking</h1>
-            <p class="subtitle">Comprehensive Desktop Activity Monitoring Application</p>
-        </header>
-        
-        <div class="main-content">
-            <h2>About Activity Tracking</h2>
-            <p>Activity Tracking is a powerful desktop application built with Electron, Vue, and TypeScript that provides comprehensive monitoring of your computer activities. Track your productivity, monitor application usage, and gain insights into your digital habits.</p>
-            
-            <div class="features">
-                <div class="feature">
-                    <h3>🔍 Comprehensive Monitoring</h3>
-                    <p>Track active windows, applications, and user interactions with detailed logging and analytics.</p>
-                </div>
-                
-                <div class="feature">
-                    <h3>📊 Detailed Analytics</h3>
-                    <p>Get insights into your productivity patterns with comprehensive dashboards and reports.</p>
-                </div>
-                
-                <div class="feature">
-                    <h3>🔒 Privacy Focused</h3>
-                    <p>All data is stored locally on your machine. Your privacy and data security are our top priorities.</p>
-                </div>
-                
-                <div class="feature">
-                    <h3>⚡ Cross-Platform</h3>
-                    <p>Available for Windows, macOS, and Linux. Built with modern web technologies for optimal performance.</p>
-                </div>
-            </div>
-            
-            <div class="download-section">
-                <h2>Download Activity Tracking</h2>
-                <p>Get the latest version of Activity Tracking for your operating system:</p>
-                <br>
-                <a href="https://github.com/keleshteri/activity-tracker/releases" class="download-btn">
-                    Download from GitHub Releases
-                </a>
-            </div>
-            
-            <h2>Features</h2>
-            <ul>
-                <li>Real-time activity monitoring</li>
-                <li>Application usage tracking</li>
-                <li>Productivity analytics</li>
-                <li>Screenshot capture capabilities</li>
-                <li>SQLite database for local data storage</li>
-                <li>Configurable tracking intervals</li>
-                <li>Export data to CSV format</li>
-                <li>System notifications</li>
-            </ul>
-            
-            <h2>Technology Stack</h2>
-            <ul>
-                <li><strong>Electron</strong> - Cross-platform desktop app framework</li>
-                <li><strong>Vue.js</strong> - Progressive JavaScript framework</li>
-                <li><strong>TypeScript</strong> - Typed superset of JavaScript</li>
-                <li><strong>SQLite</strong> - Lightweight database engine</li>
-                <li><strong>Node.js</strong> - JavaScript runtime</li>
-            </ul>
+        <div class="header">
+            <h1>Activity Tracker</h1>
+            <p>Database Documentation & API Reference</p>
         </div>
-        
-        <div class="author">
-            <p>Developed by <strong>Mohammad mehdi shaban keleshteri (MMS Keleshteri)</strong></p>
-            <p><a href="https://github.com/keleshteri/activity-tracker" class="github-link">View on GitHub</a></p>
+
+        <div class="overview">
+            <h2>Database Overview</h2>
+            <p>The Activity Tracker uses a comprehensive SQLite database schema designed for productivity analytics, pattern recognition, and user activity tracking. The system includes advanced migration support, analytics tables, and AI-powered insights.</p>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">16</div>
+                    <div class="stat-label">Database Tables</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">50+</div>
+                    <div class="stat-label">API Methods</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">Schema Version</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">TypeScript Coverage</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="docs-grid">
+            <div class="doc-card">
+                <h2>
+                    <span class="icon">📊</span>
+                    Database Schema
+                </h2>
+                <p>Comprehensive documentation of all database tables, relationships, and data structures used in the Activity Tracker application.</p>
+                
+                <ul class="features">
+                    <li>16 database tables with detailed field descriptions</li>
+                    <li>Table relationships and data flow diagrams</li>
+                    <li>Migration system documentation</li>
+                    <li>Performance optimization guidelines</li>
+                    <li>Common query patterns and examples</li>
+                    <li>Data retention and privacy considerations</li>
+                </ul>
+                
+                <a href="database-schema.md" class="btn">View Schema Documentation</a>
+            </div>
+
+            <div class="doc-card">
+                <h2>
+                    <span class="icon">🔧</span>
+                    API Reference
+                </h2>
+                <p>Complete API documentation for the DatabaseManager class with methods, parameters, return types, and practical usage examples.</p>
+                
+                <ul class="features">
+                    <li>50+ documented API methods</li>
+                    <li>TypeScript interfaces and type definitions</li>
+                    <li>Practical code examples for each method</li>
+                    <li>Error handling best practices</li>
+                    <li>Performance optimization tips</li>
+                    <li>Common usage patterns and workflows</li>
+                </ul>
+                
+                <a href="database-api.md" class="btn">View API Documentation</a>
+            </div>
+        </div>
+
+        <div class="overview">
+            <h2>Key Features</h2>
+            <div class="docs-grid">
+                <div style="background: #f7fafc; padding: 1.5rem; border-radius: 8px;">
+                    <h3 style="color: #4a5568; margin-bottom: 0.5rem;">🔄 Migration System</h3>
+                    <p style="color: #666; margin: 0;">Robust database migration system with version tracking, checksums, and safe schema updates that preserve existing data.</p>
+                </div>
+                <div style="background: #f7fafc; padding: 1.5rem; border-radius: 8px;">
+                    <h3 style="color: #4a5568; margin-bottom: 0.5rem;">📈 Analytics Tables</h3>
+                    <p style="color: #666; margin: 0;">Advanced analytics tables for work patterns, productivity blocks, and AI-generated insights with comprehensive indexing.</p>
+                </div>
+                <div style="background: #f7fafc; padding: 1.5rem; border-radius: 8px;">
+                    <h3 style="color: #4a5568; margin-bottom: 0.5rem;">🎯 Type Safety</h3>
+                    <p style="color: #666; margin: 0;">Full TypeScript support with detailed interfaces, ensuring type safety and excellent developer experience.</p>
+                </div>
+                <div style="background: #f7fafc; padding: 1.5rem; border-radius: 8px;">
+                    <h3 style="color: #4a5568; margin-bottom: 0.5rem;">⚡ Performance</h3>
+                    <p style="color: #666; margin: 0;">Optimized queries with proper indexing, efficient data structures, and performance-conscious design patterns.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Activity Tracker Database Documentation - Built with ❤️ for developers</p>
         </div>
     </div>
 </body>

@@ -154,3 +154,86 @@ export interface SystemMetrics {
   batteryLevel?: number
   isCharging?: boolean
 }
+
+// Enhanced interfaces for analytics engine
+export interface EnhancedDashboardData extends DashboardData {
+  patterns: WorkPattern[]
+  productivityBlocks: ProductivityBlock[]
+  recommendations: Insight[]
+  weeklyComparison: {
+    currentWeek: number
+    previousWeek: number
+    percentageChange: number
+  }
+  monthlyTrends: {
+    productivityTrend: 'improving' | 'declining' | 'stable'
+    focusTrend: 'improving' | 'declining' | 'stable'
+    distractionTrend: 'improving' | 'declining' | 'stable'
+  }
+}
+
+export interface WorkPattern {
+  id: string
+  type: 'daily' | 'weekly' | 'monthly'
+  name: string
+  description: string
+  confidence: number // 0-1
+  frequency: number
+  timeOfDay?: {
+    start: number // hour 0-23
+    end: number // hour 0-23
+  }
+  dayOfWeek?: number[] // 0-6, Sunday = 0
+  associatedApps: string[]
+  productivityImpact: 'positive' | 'negative' | 'neutral'
+  detectedAt: number
+  lastSeen: number
+}
+
+export interface ProductivityBlock {
+  id: string
+  startTime: number
+  endTime: number
+  duration: number
+  type: 'deep_focus' | 'shallow_work' | 'break' | 'distraction'
+  focusScore: number
+  dominantActivity: string
+  interruptions: number
+  contextSwitches: number
+  productivityRating: ProductivityRating
+  energyLevel?: 'high' | 'medium' | 'low'
+  qualityScore: number // 0-100
+}
+
+export interface Insight {
+  id: string
+  category: 'productivity' | 'focus' | 'patterns' | 'health' | 'optimization'
+  type: string
+  title: string
+  description: string
+  actionable: boolean
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  confidence: number // 0-1
+  impact: 'low' | 'medium' | 'high'
+  timeframe: 'immediate' | 'short_term' | 'long_term'
+  data: any // Supporting data for the insight
+  timestamp: number
+  expiresAt?: number
+  isDismissed: boolean
+}
+
+// Migration system interfaces
+export interface DatabaseMigration {
+  version: number
+  name: string
+  description: string
+  up: string[] // SQL statements to apply migration
+  down: string[] // SQL statements to rollback migration
+  timestamp: number
+}
+
+export interface MigrationState {
+  currentVersion: number
+  appliedMigrations: number[]
+  lastMigrationAt: number
+}
