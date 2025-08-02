@@ -66,7 +66,7 @@ function setupIPC(): void {
       return { success: true }
     } catch (error) {
       console.error('Failed to start tracker:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   })
 
@@ -76,7 +76,7 @@ function setupIPC(): void {
       return { success: true }
     } catch (error) {
       console.error('Failed to stop tracker:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   })
 
@@ -96,7 +96,7 @@ function setupIPC(): void {
       return { success: true }
     } catch (error) {
       console.error('Failed to update config:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   })
 
@@ -121,7 +121,7 @@ function setupIPC(): void {
   })
 
   // Export data
-  ipcMain.handle('data:export', async (_, format: 'json' | 'csv') => {
+  ipcMain.handle('data:export', async (_, _format: 'json' | 'csv') => {
     // TODO: Implement data export functionality
     return { success: false, error: 'Export not implemented yet' }
   })
@@ -129,6 +129,17 @@ function setupIPC(): void {
   // Settings
   ipcMain.handle('app:get-data-path', () => {
     return app.getPath('userData')
+  })
+
+  // Shell operations
+  ipcMain.handle('shell:open-path', async (_, path: string) => {
+    try {
+      await shell.openPath(path)
+      return { success: true }
+    } catch (error) {
+      console.error('Failed to open path:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
   })
 }
 

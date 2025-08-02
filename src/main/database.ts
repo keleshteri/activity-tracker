@@ -24,7 +24,7 @@ import {
 export class DatabaseManager {
   private db: sqlite3.Database | null = null
   private dbPath: string
-  private readonly CURRENT_VERSION = 2
+
 
   constructor() {
     const userDataPath = app.getPath('userData')

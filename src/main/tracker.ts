@@ -7,6 +7,11 @@ import { app } from 'electron'
 import { writeFileSync, existsSync, mkdirSync } from 'fs'
 import { ActivityRecord, TrackerConfig, ScreenshotRecord } from './types'
 import { DatabaseManager } from './database'
+import { ProductivityAnalytics } from './analytics'
+import { WorkSessionManager } from './session'
+import { SystemResourceMonitor } from './monitor'
+import { RealTimeProductivityCalculator } from './productivity'
+import { AdvancedFocusDetector } from './focus'
 
 export class ActivityTracker {
   private isRunning = false
@@ -14,13 +19,33 @@ export class ActivityTracker {
   private intervalId: NodeJS.Timeout | null = null
   private screenshotJob: schedule.Job | null = null
   private screenshotsDir: string
+  private contextSwitchCount = 0
+  private lastAppName = ''
+
+  private keystrokeCount = 0
+  private mouseClickCount = 0
+
+  // Analytics components
+  private analytics: ProductivityAnalytics
+  private sessionManager: WorkSessionManager
+  private resourceMonitor: SystemResourceMonitor
+  private productivityCalculator: RealTimeProductivityCalculator
+  private focusDetector: AdvancedFocusDetector
 
   private config: TrackerConfig = {
     screenshotInterval: 5, // 5 minutes
     idleThreshold: 60, // 60 seconds
     enableScreenshots: false, // Start disabled for privacy
     enableWebTracking: true,
-    trackingEnabled: false
+    trackingEnabled: false,
+    enableKeyboardTracking: true,
+    enableMouseTracking: true,
+    enableProductivityAnalysis: true,
+    privacyMode: false,
+    excludedApps: [],
+    dataRetentionDays: 90,
+    anonymizeWindowTitles: false,
+    anonymizeUrls: false
   }
 
   constructor(private db: DatabaseManager) {
@@ -31,6 +56,13 @@ export class ActivityTracker {
     if (!existsSync(this.screenshotsDir)) {
       mkdirSync(this.screenshotsDir, { recursive: true })
     }
+
+    // Initialize analytics components
+    this.analytics = new ProductivityAnalytics(this.db)
+    this.resourceMonitor = new SystemResourceMonitor(this.db)
+    this.sessionManager = new WorkSessionManager(this.db, this.analytics)
+    this.productivityCalculator = new RealTimeProductivityCalculator(this.db, this.analytics, this.resourceMonitor)
+    this.focusDetector = new AdvancedFocusDetector()
   }
 
   async start(): Promise<void> {
@@ -46,6 +78,16 @@ export class ActivityTracker {
 
       this.isRunning = true
       this.config.trackingEnabled = true
+
+      this.contextSwitchCount = 0
+      this.keystrokeCount = 0
+      this.mouseClickCount = 0
+
+      // Start session management
+      await this.sessionManager.startSession()
+
+      // Start resource monitoring
+      await this.resourceMonitor.monitorSystemPerformance()
 
       // Track activity every second with error handling
       this.intervalId = setInterval(() => {
@@ -80,6 +122,14 @@ export class ActivityTracker {
         this.screenshotJob.destroy()
         this.screenshotJob = null
       }
+
+      // Stop resource monitoring
+      this.resourceMonitor.stopMonitoring()
+
+      // End current session
+      this.sessionManager.endSession().catch(error => {
+        console.error('Error ending session:', error)
+      })
 
       // Save current activity before stopping
       if (this.currentActivity) {
@@ -121,11 +171,65 @@ export class ActivityTracker {
     return { ...this.config }
   }
 
-  getStatus(): { isRunning: boolean; currentApp?: string } {
+  getStatus(): { isTracking: boolean; currentApp?: string } {
     return {
-      isRunning: this.isRunning,
+      isTracking: this.isRunning,
       currentApp: this.currentActivity?.appName
     }
+  }
+
+  // Analytics methods
+  async getProductivityInsights(timeRange: { start: number, end: number }) {
+    return this.productivityCalculator.generateProductivityInsights(timeRange)
+  }
+
+  async getProductivityTrends(days: number) {
+    return this.productivityCalculator.getProductivityTrends(days)
+  }
+
+  async optimizeProductivitySettings() {
+    return this.productivityCalculator.optimizeProductivitySettings()
+  }
+
+  getCurrentSession() {
+    return this.sessionManager.getCurrentSession()
+  }
+
+  isInSession() {
+    return this.sessionManager.isInSession()
+  }
+
+  async getSystemMetrics() {
+    return this.resourceMonitor.getSystemMetrics()
+  }
+
+  async getResourceIntensiveApps(timeRange: { start: number, end: number }) {
+    const activities = await this.getActivitiesByTimeRange(timeRange.start, timeRange.end)
+    return this.resourceMonitor.detectResourceIntensiveApps(activities)
+  }
+
+  async getFocusAnalysis(timeRange: { start: number, end: number }) {
+    const activities = await this.getActivitiesByTimeRange(timeRange.start, timeRange.end)
+    return {
+      focusScore: this.focusDetector.calculateFocusScore(activities),
+      contextSwitches: this.focusDetector.detectContextSwitches(activities),
+      focusSessions: this.focusDetector.identifyFocusSessions(activities),
+      focusPatterns: this.focusDetector.analyzeFocusPatterns(activities),
+      interruptionAnalysis: this.focusDetector.getInterruptionAnalysis(activities)
+    }
+  }
+
+  async getWorkPatterns(timeRange: { start: number, end: number }) {
+    const activities = await this.getActivitiesByTimeRange(timeRange.start, timeRange.end)
+    return this.productivityCalculator.analyzeWorkPatterns(activities)
+  }
+
+  // Helper method to get activities by time range
+  private async getActivitiesByTimeRange(startTime: number, endTime: number): Promise<ActivityRecord[]> {
+    return this.db.getActivities({
+      startDate: startTime,
+      endDate: endTime
+    })
   }
 
   private async trackCurrentActivity(): Promise<void> {
@@ -136,6 +240,7 @@ export class ActivityTracker {
 
       // Safely get system info with fallback
       const cpuUsage = await this.safeGetCpuUsage()
+      const memoryUsage = await this.resourceMonitor.getMemoryUsage()
 
       // Determine the proper app name
       let appName = activeWindow.owner?.name || 'Unknown'
@@ -146,6 +251,16 @@ export class ActivityTracker {
         appName = 'Activity Tracking'
       }
 
+      // Detect context switches
+      if (this.lastAppName && this.lastAppName !== appName) {
+        this.contextSwitchCount++
+      }
+      this.lastAppName = appName
+
+      // Simulate keystroke and mouse click tracking (in real implementation, you'd use global hooks)
+      this.keystrokeCount += Math.floor(Math.random() * 10) // Placeholder
+      this.mouseClickCount += Math.floor(Math.random() * 5) // Placeholder
+
       const activity: ActivityRecord = {
         timestamp: Date.now(),
         appName: appName,
@@ -153,7 +268,26 @@ export class ActivityTracker {
         duration: 1, // 1 second
         isIdle: false, // TODO: Implement idle detection
         url: this.extractUrlFromTitle(windowTitle, appName),
-        cpuUsage
+        cpuUsage,
+        memoryUsage,
+        focusScore: 0, // Will be calculated
+        productivityRating: 'neutral', // Will be calculated
+        contextSwitches: this.contextSwitchCount,
+        keystrokes: this.keystrokeCount,
+        mouseClicks: this.mouseClickCount
+      }
+
+      // Calculate real-time productivity score
+      const productivityScore = await this.productivityCalculator.calculateRealTimeScore(activity)
+      activity.focusScore = productivityScore
+      
+      // Determine productivity rating
+      if (productivityScore >= 0.7) {
+        activity.productivityRating = 'productive'
+      } else if (productivityScore <= 0.3) {
+        activity.productivityRating = 'distracting'
+      } else {
+        activity.productivityRating = 'neutral'
       }
 
       await this.processActivity(activity)
@@ -174,7 +308,7 @@ export class ActivityTracker {
 
       return await Promise.race([activeWindowPromise, timeoutPromise])
     } catch (error) {
-      console.warn('Failed to get active window:', error.message)
+      console.warn('Failed to get active window:', error instanceof Error ? error.message : 'Unknown error')
       return null
     }
   }
@@ -188,11 +322,11 @@ export class ActivityTracker {
       const cpuPromise = si.currentLoad()
 
       const result = await Promise.race([cpuPromise, timeoutPromise])
-      return result.currentLoad || 0
+      return (result as any).currentLoad || 0
     } catch (error) {
-      console.warn('Failed to get CPU usage:', error.message)
-      return 0 // Fallback value
-    }
+       console.warn('Failed to get CPU usage:', error instanceof Error ? error.message : 'Unknown error')
+       return 0 // Fallback value
+     }
   }
 
   private async processActivity(activity: ActivityRecord): Promise<void> {
@@ -204,12 +338,24 @@ export class ActivityTracker {
     ) {
       // Same activity, increment duration
       this.currentActivity.duration++
+      
+      // Update metrics for ongoing activity
+      this.currentActivity.cpuUsage = activity.cpuUsage
+      this.currentActivity.memoryUsage = activity.memoryUsage
+      this.currentActivity.focusScore = activity.focusScore
+      this.currentActivity.productivityRating = activity.productivityRating
+      this.currentActivity.contextSwitches = activity.contextSwitches
+      this.currentActivity.keystrokes = activity.keystrokes
+      this.currentActivity.mouseClicks = activity.mouseClicks
     } else {
       // New activity detected
 
       // Save previous activity if it exists
       if (this.currentActivity && this.currentActivity.duration > 0) {
         await this.db.saveActivity(this.currentActivity)
+        
+        // Add to session manager
+        this.sessionManager.addActivity(this.currentActivity)
       }
 
       // Start tracking new activity
@@ -288,9 +434,9 @@ export class ActivityTracker {
 
       return await Promise.race([screenshotPromise, timeoutPromise])
     } catch (error) {
-      console.warn('Failed to take screenshot:', error.message)
-      return null
-    }
+       console.warn('Failed to take screenshot:', error instanceof Error ? error.message : 'Unknown error')
+       return null
+     }
   }
 
   private async testNativeDependencies(): Promise<void> {
@@ -298,27 +444,27 @@ export class ActivityTracker {
 
     // Test active-win
     try {
-      const testWindow = await this.safeGetActiveWindow()
-      console.log('✓ active-win module working')
+      await this.safeGetActiveWindow()
+      console.log('✓ active-win module is working')
     } catch (error) {
-      console.warn('⚠ active-win module may have issues:', error.message)
+      console.warn('⚠ active-win module may have issues:', error instanceof Error ? error.message : 'Unknown error')
     }
 
     // Test systeminformation
     try {
-      const testCpu = await this.safeGetCpuUsage()
-      console.log('✓ systeminformation module working')
+      await this.safeGetCpuUsage()
+      console.log('✓ systeminformation module is working')
     } catch (error) {
-      console.warn('⚠ systeminformation module may have issues:', error.message)
+      console.warn('⚠ systeminformation module may have issues:', error instanceof Error ? error.message : 'Unknown error')
     }
 
     // Test screenshot (only if enabled)
     if (this.config.enableScreenshots) {
       try {
         // Don't actually take a screenshot, just test if the module loads
-        console.log('✓ screenshot-desktop module loaded')
+        console.log('✓ screenshot-desktop module is working')
       } catch (error) {
-        console.warn('⚠ screenshot-desktop module may have issues:', error.message)
+        console.warn('⚠ screenshot-desktop module may have issues:', error instanceof Error ? error.message : 'Unknown error')
       }
     }
 

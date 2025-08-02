@@ -1,11 +1,11 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
 interface TrackerAPI {
-  start: () => Promise<void>
-  stop: () => Promise<void>
+  start: () => Promise<{ success: boolean; error?: string }>
+  stop: () => Promise<{ success: boolean; error?: string }>
   getStatus: () => Promise<{ isTracking: boolean; currentApp?: string }>
   getConfig: () => Promise<any>
-  updateConfig: (config: any) => Promise<void>
+  updateConfig: (config: any) => Promise<{ success: boolean; error?: string }>
 }
 
 interface DashboardAPI {
@@ -13,21 +13,31 @@ interface DashboardAPI {
 }
 
 interface DataAPI {
-  export: (format: 'json' | 'csv') => Promise<void>
+  export: (format: 'json' | 'csv') => Promise<{ success: boolean; error?: string }>
+  getDataPath: () => Promise<string>
 }
 
 interface ActivityAPI {
   getActivities: (filters?: any) => Promise<any[]>
 }
 
+interface ShellAPI {
+  openPath: (path: string) => Promise<void>
+}
+
+interface ExtendedElectronAPI extends ElectronAPI {
+  shell: ShellAPI
+}
+
 declare global {
   interface Window {
-    electron: ElectronAPI
+    electron: ExtendedElectronAPI
     api: {
       tracker: TrackerAPI
       dashboard: DashboardAPI
       data: DataAPI
       activity: ActivityAPI
+      shell: ShellAPI
     }
   }
 }

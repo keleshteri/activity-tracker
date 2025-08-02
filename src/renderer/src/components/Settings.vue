@@ -124,13 +124,13 @@ const showMessage = (text: string, type: 'success' | 'error') => {
 }
 
 const openDataFolder = () => {
-  if (!window.electron || !window.electron.shell) {
+  if (!window.api || !window.api.shell) {
     console.warn('Shell API not available, cannot open folder')
     showMessage('Data folder access not available in demo mode', 'error')
     return
   }
   if (dataPath.value && dataPath.value !== 'Data path not available in demo mode') {
-    window.electron.shell.openPath(dataPath.value)
+    window.api.shell.openPath(dataPath.value)
   } else {
     showMessage('Data path not available', 'error')
   }

@@ -29,6 +29,11 @@ const api = {
     getActivities: (filters?: any) => ipcRenderer.invoke('activity:get-activities', filters)
   },
 
+  // Shell APIs
+  shell: {
+    openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path)
+  },
+
   // Utility APIs
   ping: () => ipcRenderer.send('ping')
 }

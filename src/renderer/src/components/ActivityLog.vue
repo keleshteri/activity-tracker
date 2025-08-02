@@ -200,13 +200,13 @@ const loadActivities = async () => {
     loading.value = true
     error.value = ''
 
-    if (!window.api || !window.api.activities) {
+    if (!window.api || !window.api.activity) {
       console.warn('Activities API not available, using mock data')
       // Simulate loading delay
       await new Promise((resolve) => setTimeout(resolve, 500))
       activities.value = mockActivities
     } else {
-      const data = await window.api.activities.getAll()
+      const data = await window.api.activity.getActivities()
       activities.value = data || []
     }
   } catch (err) {

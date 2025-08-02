@@ -27,7 +27,7 @@ const updateStatus = async () => {
     const status = await window.api.tracker.getStatus()
     console.log('Status received:', status)
     console.log('Current isTracking before update:', isTracking.value)
-    isTracking.value = status.isRunning
+    isTracking.value = status.isTracking
     currentApp.value = status.currentApp || 'No active app'
     console.log('isTracking after update:', isTracking.value)
   } catch (err) {
