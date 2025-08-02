@@ -1,10 +1,10 @@
 {
   "name": "activity-tracker",
   "version": "1.0.0",
-  "description": "An Electron application with Vue and TypeScript",
+  "description": "Activity Tracking - Comprehensive desktop activity monitoring application",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "Mohammad mehdi shaban keleshteri <MMS Keleshteri>",
+  "homepage": "https://github.com/keleshteri/activity-tracker",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
@@ -23,13 +23,23 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "electron-updater": "^6.3.9"
+    "active-win": "^8.2.1",
+    "crypto-js": "^4.2.0",
+    "csv-writer": "^1.6.0",
+    "electron-updater": "^6.3.9",
+    "fs-extra": "^11.3.0",
+    "node-notifier": "^10.0.1",
+    "node-schedule": "^2.1.1",
+    "screenshot-desktop": "^1.15.1",
+    "sqlite3": "^5.1.7",
+    "systeminformation": "^5.27.7"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.0.0",
     "@electron-toolkit/tsconfig": "^1.0.1",
     "@types/node": "^22.16.5",
+    "@types/sqlite3": "^3.1.11",
     "@vitejs/plugin-vue": "^6.0.0",
     "electron": "^37.2.3",
     "electron-builder": "^25.1.8",
@@ -37,6 +47,7 @@
     "eslint": "^9.31.0",
     "eslint-plugin-vue": "^10.3.0",
     "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "vite": "^7.0.5",
     "vue": "^3.5.17",
