@@ -2002,6 +2002,67 @@ export class DatabaseManager {
     })
   }
 
+  getDatabasePath(): string {
+    return this.dbPath
+  }
+
+  async cleanupOldData(retentionDays: number): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const cutoffTimestamp = Date.now() - (retentionDays * 24 * 60 * 60 * 1000)
+
+    return new Promise((resolve, reject) => {
+      this.db!.serialize(() => {
+        // Clean up old activities
+        this.db!.run(
+          'DELETE FROM activities WHERE timestamp < ?',
+          [cutoffTimestamp],
+          (err) => {
+            if (err) {
+              console.error('Failed to cleanup old activities:', err)
+            }
+          }
+        )
+
+        // Clean up old screenshots
+        this.db!.run(
+          'DELETE FROM screenshots WHERE timestamp < ?',
+          [cutoffTimestamp],
+          (err) => {
+            if (err) {
+              console.error('Failed to cleanup old screenshots:', err)
+            }
+          }
+        )
+
+        // Clean up old distraction events
+        this.db!.run(
+          'DELETE FROM distraction_events WHERE timestamp < ?',
+          [cutoffTimestamp],
+          (err) => {
+            if (err) {
+              console.error('Failed to cleanup old distraction events:', err)
+            }
+          }
+        )
+
+        // Clean up expired insights
+        this.db!.run(
+          'DELETE FROM insights WHERE expires_at IS NOT NULL AND expires_at < ?',
+          [Date.now()],
+          (err) => {
+            if (err) {
+              console.error('Failed to cleanup expired insights:', err)
+              reject(err)
+            } else {
+              resolve()
+            }
+          }
+        )
+      })
+    })
+  }
+
   close(): void {
     if (this.db) {
       this.db.close()

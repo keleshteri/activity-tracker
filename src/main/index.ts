@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -361,6 +361,130 @@ function setupIPC(): void {
         return await focusManager.recordInterruption(interruption)
       } catch (error) {
         console.error('Failed to record interruption:', error)
+        throw error
+      }
+    })
+
+    // Database API handlers
+    ipcMain.handle('database:save-user-preference', async (_, key: string, value: any, type?: string) => {
+      try {
+        await databaseManager.saveUserPreference(key, value, type)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to save user preference:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('database:get-user-preference', async (_, key: string) => {
+      try {
+        return await databaseManager.getUserPreference(key)
+      } catch (error) {
+        console.error('Failed to get user preference:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('database:get-all-user-preferences', async () => {
+      try {
+        return await databaseManager.getAllUserPreferences()
+      } catch (error) {
+        console.error('Failed to get all user preferences:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('database:save-privacy-settings', async (_, settings) => {
+      try {
+        await databaseManager.savePrivacySettings(settings)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to save privacy settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('database:get-privacy-settings', async () => {
+      try {
+        return await databaseManager.getPrivacySettings()
+      } catch (error) {
+        console.error('Failed to get privacy settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('database:save-distraction-settings', async (_, settings) => {
+      try {
+        await databaseManager.saveDistractionSettings(settings)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to save distraction settings:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('database:get-distraction-settings', async () => {
+      try {
+        return await databaseManager.getDistractionSettings()
+      } catch (error) {
+        console.error('Failed to get distraction settings:', error)
+        throw error
+      }
+    })
+
+    // File system operations
+    ipcMain.handle('file:select-backup-location', async () => {
+      try {
+        const result = await dialog.showOpenDialog(mainWindow!, {
+          properties: ['openDirectory'],
+          title: 'Select Backup Location'
+        })
+        return result.canceled ? null : result.filePaths[0]
+      } catch (error) {
+        console.error('Failed to select backup location:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('file:perform-backup', async (_, backupPath: string) => {
+      try {
+        const fs = require('fs').promises
+        const path = require('path')
+        const dbPath = databaseManager.getDatabasePath()
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const backupFileName = `activity-tracker-backup-${timestamp}.db`
+        const backupFilePath = path.join(backupPath, backupFileName)
+        
+        await fs.copyFile(dbPath, backupFilePath)
+        return { success: true, backupPath: backupFilePath }
+      } catch (error) {
+        console.error('Failed to perform backup:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('file:cleanup-old-data', async (_, retentionDays: number) => {
+      try {
+        await databaseManager.cleanupOldData(retentionDays)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to cleanup old data:', error)
+        throw error
+      }
+    })
+
+    // Notification testing
+    ipcMain.handle('notification:test', async (_, message: string) => {
+      try {
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Activity Tracker',
+            body: message || 'This is a test notification'
+          }).show()
+        }
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to show test notification:', error)
         throw error
       }
     })

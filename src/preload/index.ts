@@ -34,6 +34,36 @@ const api = {
     openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path)
   },
 
+  // Database APIs
+  database: {
+    saveUserPreference: (key: string, value: any, type?: string) => 
+      ipcRenderer.invoke('database:save-user-preference', key, value, type),
+    getUserPreference: (key: string) => 
+      ipcRenderer.invoke('database:get-user-preference', key),
+    getAllUserPreferences: () => 
+      ipcRenderer.invoke('database:get-all-user-preferences'),
+    savePrivacySettings: (settings: any) => 
+      ipcRenderer.invoke('database:save-privacy-settings', settings),
+    getPrivacySettings: () => 
+      ipcRenderer.invoke('database:get-privacy-settings'),
+    saveDistractionSettings: (settings: any) => 
+      ipcRenderer.invoke('database:save-distraction-settings', settings),
+    getDistractionSettings: () => 
+      ipcRenderer.invoke('database:get-distraction-settings')
+  },
+
+  // File system APIs
+  file: {
+    selectBackupLocation: () => ipcRenderer.invoke('file:select-backup-location'),
+    performBackup: (backupPath: string) => ipcRenderer.invoke('file:perform-backup', backupPath),
+    cleanupOldData: (retentionDays: number) => ipcRenderer.invoke('file:cleanup-old-data', retentionDays)
+  },
+
+  // Notification APIs
+  notification: {
+    test: (message?: string) => ipcRenderer.invoke('notification:test', message)
+  },
+
   // Utility APIs
   ping: () => ipcRenderer.send('ping')
 }
@@ -60,3 +90,6 @@ export type TrackerAPI = typeof api.tracker
 export type DashboardAPI = typeof api.dashboard
 export type DataAPI = typeof api.data
 export type ActivityAPI = typeof api.activity
+export type DatabaseAPI = typeof api.database
+export type FileAPI = typeof api.file
+export type NotificationAPI = typeof api.notification
