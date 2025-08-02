@@ -16,9 +16,6 @@
       </div>
     </div>
 
-    <!-- Chart.js Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <!-- Loading State -->
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>

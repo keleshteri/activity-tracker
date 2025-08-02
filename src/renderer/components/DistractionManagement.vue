@@ -20,12 +20,12 @@
       <div class="settings-card">
         <div class="setting-group">
           <label class="setting-label">
-            <input 
-              type="checkbox" 
-              v-model="settings.enabled" 
+            <input
+              type="checkbox"
+              v-model="settings.enabled"
               @change="saveSettings"
               class="setting-checkbox"
-            >
+            />
             Enable Distraction Detection
           </label>
           <p class="setting-description">
@@ -35,14 +35,14 @@
 
         <div class="setting-group" v-if="settings.enabled">
           <label class="setting-label">Distraction Threshold (minutes)</label>
-          <input 
-            type="number" 
-            v-model.number="settings.thresholdMinutes" 
+          <input
+            type="number"
+            v-model.number="settings.thresholdMinutes"
             @change="saveSettings"
-            min="1" 
-            max="60" 
+            min="1"
+            max="60"
             class="setting-input"
-          >
+          />
           <p class="setting-description">
             How long you can use a distracting app before getting a notification
           </p>
@@ -55,21 +55,19 @@
             <option value="persistent">Persistent Alert</option>
             <option value="blocking">Blocking Warning</option>
           </select>
-          <p class="setting-description">
-            Choose how you want to be notified about distractions
-          </p>
+          <p class="setting-description">Choose how you want to be notified about distractions</p>
         </div>
 
         <div class="setting-group" v-if="settings.enabled">
           <label class="setting-label">Break Reminder Interval (minutes)</label>
-          <input 
-            type="number" 
-            v-model.number="settings.breakReminderInterval" 
+          <input
+            type="number"
+            v-model.number="settings.breakReminderInterval"
             @change="saveSettings"
-            min="15" 
-            max="120" 
+            min="15"
+            max="120"
             class="setting-input"
-          >
+          />
           <p class="setting-description">
             How often to remind you to take breaks during focused work
           </p>
@@ -77,56 +75,52 @@
 
         <div class="setting-group" v-if="settings.enabled">
           <label class="setting-label">
-            <input 
-              type="checkbox" 
-              v-model="settings.quietHoursEnabled" 
+            <input
+              type="checkbox"
+              v-model="settings.quietHoursEnabled"
               @change="saveSettings"
               class="setting-checkbox"
-            >
+            />
             Enable Quiet Hours
           </label>
-          <p class="setting-description">
-            Disable notifications during specified hours
-          </p>
+          <p class="setting-description">Disable notifications during specified hours</p>
         </div>
 
         <div class="quiet-hours-config" v-if="settings.enabled && settings.quietHoursEnabled">
           <div class="time-range">
             <div class="time-input-group">
               <label>Start Time</label>
-              <input 
-                type="time" 
-                v-model="settings.quietHoursStart" 
+              <input
+                type="time"
+                v-model="settings.quietHoursStart"
                 @change="saveSettings"
                 class="time-input"
-              >
+              />
             </div>
             <div class="time-input-group">
               <label>End Time</label>
-              <input 
-                type="time" 
-                v-model="settings.quietHoursEnd" 
+              <input
+                type="time"
+                v-model="settings.quietHoursEnd"
                 @change="saveSettings"
                 class="time-input"
-              >
+              />
             </div>
           </div>
         </div>
 
         <div class="setting-group" v-if="settings.enabled">
           <label class="setting-label">Productivity Goal (hours per day)</label>
-          <input 
-            type="number" 
-            v-model.number="settings.productivityGoal" 
+          <input
+            type="number"
+            v-model.number="settings.productivityGoal"
             @change="saveSettings"
-            min="1" 
-            max="16" 
-            step="0.5" 
+            min="1"
+            max="16"
+            step="0.5"
             class="setting-input"
-          >
-          <p class="setting-description">
-            Daily goal for productive application usage
-          </p>
+          />
+          <p class="setting-description">Daily goal for productive application usage</p>
         </div>
       </div>
     </div>
@@ -170,7 +164,7 @@
           <option value="high">High</option>
         </select>
       </div>
-      
+
       <div class="events-list">
         <div v-if="filteredEvents.length === 0" class="no-events">
           <p>No distraction events found for the selected period.</p>
@@ -184,12 +178,8 @@
             <div class="event-time">{{ formatEventTime(event.timestamp) }}</div>
           </div>
           <div class="event-details">
-            <div class="event-duration">
-              Duration: {{ formatDuration(event.duration) }}
-            </div>
-            <div class="event-category" v-if="event.category">
-              Category: {{ event.category }}
-            </div>
+            <div class="event-duration">Duration: {{ formatDuration(event.duration) }}</div>
+            <div class="event-category" v-if="event.category">Category: {{ event.category }}</div>
           </div>
           <div class="event-actions">
             <button @click="categorizeApp(event.appName)" class="btn btn-sm btn-secondary">
@@ -198,6 +188,95 @@
             <button @click="addToWhitelist(event.appName)" class="btn btn-sm btn-primary">
               Add to Whitelist
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Focus Session Timer -->
+    <div class="focus-session-section">
+      <h3>Focus Session Timer</h3>
+      <div class="focus-timer-card">
+        <div class="timer-display">
+          <div class="time-remaining">{{ formatTime(focusTimer.timeRemaining) }}</div>
+          <div class="session-type">
+            {{ focusTimer.sessionType === 'focus' ? 'Focus Session' : 'Break Time' }}
+          </div>
+        </div>
+
+        <div class="timer-controls">
+          <button
+            v-if="!focusTimer.isActive"
+            @click="startFocusSession"
+            class="btn btn-primary timer-btn"
+          >
+            <i class="icon-play"></i>
+            Start Focus Session
+          </button>
+
+          <button
+            v-if="focusTimer.isActive && !focusTimer.isPaused"
+            @click="pauseFocusSession"
+            class="btn btn-secondary timer-btn"
+          >
+            <i class="icon-pause"></i>
+            Pause
+          </button>
+
+          <button
+            v-if="focusTimer.isActive && focusTimer.isPaused"
+            @click="resumeFocusSession"
+            class="btn btn-primary timer-btn"
+          >
+            <i class="icon-play"></i>
+            Resume
+          </button>
+
+          <button
+            v-if="focusTimer.isActive"
+            @click="stopFocusSession"
+            class="btn btn-danger timer-btn"
+          >
+            <i class="icon-stop"></i>
+            Stop
+          </button>
+        </div>
+
+        <div class="timer-settings">
+          <div class="setting-row">
+            <label>Session Duration:</label>
+            <select
+              v-model="focusTimer.duration"
+              :disabled="focusTimer.isActive"
+              class="duration-select"
+            >
+              <option value="1500000">25 minutes (Pomodoro)</option>
+              <option value="3000000">50 minutes</option>
+              <option value="5400000">90 minutes</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+
+          <div class="setting-row" v-if="focusTimer.duration === 'custom'">
+            <label>Custom Duration (minutes):</label>
+            <input
+              type="number"
+              v-model.number="focusTimer.customDuration"
+              min="5"
+              max="180"
+              class="duration-input"
+            />
+          </div>
+
+          <div class="setting-row">
+            <label>
+              <input
+                type="checkbox"
+                v-model="focusTimer.pomodoroMode"
+                :disabled="focusTimer.isActive"
+              />
+              Enable Pomodoro Mode (automatic breaks)
+            </label>
           </div>
         </div>
       </div>
@@ -216,7 +295,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="pattern-card">
           <h4>Peak Distraction Hours</h4>
           <div class="pattern-list">
@@ -226,7 +305,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="pattern-card">
           <h4>Weekly Trends</h4>
           <div class="pattern-list">
@@ -276,7 +355,17 @@ export default {
       eventsFilter: 'today',
       severityFilter: '',
       loading: false,
-      loadingText: 'Loading...'
+      loadingText: 'Loading...',
+      focusTimer: {
+        isActive: false,
+        isPaused: false,
+        timeRemaining: 1500000, // 25 minutes in milliseconds
+        duration: '1500000',
+        customDuration: 25,
+        sessionType: 'focus',
+        pomodoroMode: true,
+        timer: null
+      }
     }
   },
   async mounted() {
@@ -286,7 +375,7 @@ export default {
     async loadData() {
       this.loading = true
       this.loadingText = 'Loading distraction data...'
-      
+
       try {
         await Promise.all([
           this.loadSettings(),
@@ -301,7 +390,7 @@ export default {
         this.loading = false
       }
     },
-    
+
     async loadSettings() {
       try {
         const settings = await window.electronAPI.invoke('distraction:get-settings')
@@ -312,7 +401,7 @@ export default {
         console.error('Failed to load settings:', error)
       }
     },
-    
+
     async saveSettings() {
       try {
         await window.electronAPI.invoke('distraction:save-settings', this.settings)
@@ -322,7 +411,7 @@ export default {
         this.$emit('error', 'Failed to save distraction settings')
       }
     },
-    
+
     async loadEvents() {
       try {
         const timeRange = this.getTimeRange()
@@ -333,113 +422,119 @@ export default {
         console.error('Failed to load events:', error)
       }
     },
-    
+
     filterEvents() {
-      this.filteredEvents = this.events.filter(event => {
+      this.filteredEvents = this.events.filter((event) => {
         return !this.severityFilter || event.severity === this.severityFilter
       })
     },
-    
+
     async loadStatistics() {
       // Calculate statistics from events
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      
-      const todayEvents = this.events.filter(event => 
-        new Date(event.timestamp) >= today
-      )
-      
+
+      const todayEvents = this.events.filter((event) => new Date(event.timestamp) >= today)
+
       this.todayStats = {
         totalDistractions: todayEvents.length,
         totalDistractionTime: todayEvents.reduce((sum, event) => sum + event.duration, 0),
-        longestDistraction: Math.max(...todayEvents.map(event => event.duration), 0),
+        longestDistraction: Math.max(...todayEvents.map((event) => event.duration), 0),
         productivityScore: this.calculateProductivityScore(todayEvents)
       }
     },
-    
+
     async loadPatterns() {
       // Calculate patterns from events
       this.calculateTopDistractingApps()
       this.calculatePeakHours()
       this.calculateWeeklyTrends()
     },
-    
+
     calculateTopDistractingApps() {
       const appTimes = {}
-      this.events.forEach(event => {
+      this.events.forEach((event) => {
         if (!appTimes[event.appName]) {
           appTimes[event.appName] = 0
         }
         appTimes[event.appName] += event.duration
       })
-      
+
       this.topDistractingApps = Object.entries(appTimes)
         .map(([name, totalTime]) => ({ name, totalTime }))
         .sort((a, b) => b.totalTime - a.totalTime)
         .slice(0, 5)
     },
-    
+
     calculatePeakHours() {
       const hourCounts = {}
-      this.events.forEach(event => {
+      this.events.forEach((event) => {
         const hour = new Date(event.timestamp).getHours()
         hourCounts[hour] = (hourCounts[hour] || 0) + 1
       })
-      
+
       this.peakDistractionHours = Object.entries(hourCounts)
         .map(([hour, count]) => ({ hour: parseInt(hour), count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
     },
-    
+
     calculateWeeklyTrends() {
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      const dayNames = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday'
+      ]
       const dayStats = {}
-      
+
       // Initialize all days
-      dayNames.forEach(day => {
+      dayNames.forEach((day) => {
         dayStats[day] = { events: 0, totalTime: 0 }
       })
-      
+
       // Calculate stats for each day
-      this.events.forEach(event => {
+      this.events.forEach((event) => {
         const dayName = dayNames[new Date(event.timestamp).getDay()]
         dayStats[dayName].events++
         dayStats[dayName].totalTime += event.duration
       })
-      
-      this.weeklyTrends = dayNames.map(day => ({
+
+      this.weeklyTrends = dayNames.map((day) => ({
         day,
         productivityScore: this.calculateDayProductivityScore(dayStats[day])
       }))
     },
-    
+
     calculateProductivityScore(events) {
       if (events.length === 0) return 100
-      
+
       const totalTime = events.reduce((sum, event) => sum + event.duration, 0)
       const highSeverityTime = events
-        .filter(event => event.severity === 'high')
+        .filter((event) => event.severity === 'high')
         .reduce((sum, event) => sum + event.duration, 0)
-      
+
       const distractionRatio = totalTime > 0 ? highSeverityTime / totalTime : 0
-      return Math.max(0, Math.round(100 - (distractionRatio * 100)))
+      return Math.max(0, Math.round(100 - distractionRatio * 100))
     },
-    
+
     calculateDayProductivityScore(dayStats) {
       if (dayStats.events === 0) return 100
-      
+
       // Simple calculation based on number of events and total time
       const eventPenalty = Math.min(dayStats.events * 2, 50)
-      const timePenalty = Math.min(dayStats.totalTime / 60000 * 5, 50) // Convert ms to minutes
-      
+      const timePenalty = Math.min((dayStats.totalTime / 60000) * 5, 50) // Convert ms to minutes
+
       return Math.max(0, Math.round(100 - eventPenalty - timePenalty))
     },
-    
+
     getTimeRange() {
       const now = new Date()
       let startTime
-      
+
       switch (this.eventsFilter) {
         case 'today':
           startTime = new Date(now)
@@ -457,17 +552,17 @@ export default {
           startTime = new Date(now)
           startTime.setHours(0, 0, 0, 0)
       }
-      
+
       return {
         startTime: startTime.getTime(),
         endTime: now.getTime()
       }
     },
-    
+
     async refreshData() {
       await this.loadData()
     },
-    
+
     async testNotification() {
       try {
         // This would trigger a test notification from the main process
@@ -478,11 +573,11 @@ export default {
         this.$emit('error', 'Failed to send test notification')
       }
     },
-    
+
     async categorizeApp(appName) {
       this.$emit('navigate-to-categorization', appName)
     },
-    
+
     async addToWhitelist(appName) {
       // This would add the app to a whitelist to prevent future distraction alerts
       try {
@@ -494,7 +589,7 @@ export default {
           createdAt: Date.now(),
           updatedAt: Date.now()
         })
-        
+
         this.$emit('success', `${appName} added to productive apps`)
         await this.loadEvents()
       } catch (error) {
@@ -502,33 +597,172 @@ export default {
         this.$emit('error', 'Failed to add app to whitelist')
       }
     },
-    
+
     formatDuration(milliseconds) {
       if (!milliseconds) return '0m'
-      
+
       const minutes = Math.floor(milliseconds / 60000)
       const hours = Math.floor(minutes / 60)
-      
+
       if (hours > 0) {
         const remainingMinutes = minutes % 60
         return `${hours}h ${remainingMinutes}m`
       }
-      
+
       return `${minutes}m`
     },
-    
+
     formatEventTime(timestamp) {
-      return new Date(timestamp).toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+      return new Date(timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
       })
     },
-    
+
     formatHour(hour) {
-      return new Date(2000, 0, 1, hour).toLocaleTimeString([], { 
+      return new Date(2000, 0, 1, hour).toLocaleTimeString([], {
         hour: 'numeric',
-        hour12: true 
+        hour12: true
       })
+    },
+
+    // Focus Timer Methods
+    startFocusSession() {
+      const duration =
+        this.focusTimer.duration === 'custom'
+          ? this.focusTimer.customDuration * 60000
+          : parseInt(this.focusTimer.duration)
+
+      this.focusTimer.timeRemaining = duration
+      this.focusTimer.isActive = true
+      this.focusTimer.isPaused = false
+      this.focusTimer.sessionType = 'focus'
+
+      this.startTimer()
+
+      // Notify about focus session start
+      if (window.electronAPI) {
+        window.electronAPI.invoke('focus-session:start', {
+          duration,
+          type: this.focusTimer.pomodoroMode ? 'pomodoro' : 'custom'
+        })
+      }
+    },
+
+    pauseFocusSession() {
+      this.focusTimer.isPaused = true
+      this.stopTimer()
+
+      if (window.electronAPI) {
+        window.electronAPI.invoke('focus-session:pause')
+      }
+    },
+
+    resumeFocusSession() {
+      this.focusTimer.isPaused = false
+      this.startTimer()
+
+      if (window.electronAPI) {
+        window.electronAPI.invoke('focus-session:resume')
+      }
+    },
+
+    stopFocusSession() {
+      this.focusTimer.isActive = false
+      this.focusTimer.isPaused = false
+      this.stopTimer()
+
+      if (window.electronAPI) {
+        window.electronAPI.invoke('focus-session:stop')
+      }
+
+      // Reset timer
+      const duration =
+        this.focusTimer.duration === 'custom'
+          ? this.focusTimer.customDuration * 60000
+          : parseInt(this.focusTimer.duration)
+      this.focusTimer.timeRemaining = duration
+    },
+
+    startTimer() {
+      if (this.focusTimer.timer) {
+        clearInterval(this.focusTimer.timer)
+      }
+
+      this.focusTimer.timer = setInterval(() => {
+        if (this.focusTimer.timeRemaining > 0) {
+          this.focusTimer.timeRemaining -= 1000
+        } else {
+          this.onTimerComplete()
+        }
+      }, 1000)
+    },
+
+    stopTimer() {
+      if (this.focusTimer.timer) {
+        clearInterval(this.focusTimer.timer)
+        this.focusTimer.timer = null
+      }
+    },
+
+    onTimerComplete() {
+      this.stopTimer()
+
+      if (this.focusTimer.sessionType === 'focus') {
+        // Focus session completed
+        if (this.focusTimer.pomodoroMode) {
+          // Start break
+          this.focusTimer.sessionType = 'break'
+          this.focusTimer.timeRemaining = 300000 // 5 minutes break
+          this.startTimer()
+
+          // Show notification
+          this.showNotification('Focus session completed! Time for a break.', 'success')
+        } else {
+          // End session
+          this.focusTimer.isActive = false
+          this.showNotification('Focus session completed!', 'success')
+        }
+      } else {
+        // Break completed
+        this.focusTimer.isActive = false
+        this.focusTimer.sessionType = 'focus'
+        this.showNotification('Break time is over! Ready for another focus session?', 'info')
+      }
+
+      if (window.electronAPI) {
+        window.electronAPI.invoke('focus-session:complete', {
+          type: this.focusTimer.sessionType
+        })
+      }
+    },
+
+    formatTime(milliseconds) {
+      const totalSeconds = Math.floor(milliseconds / 1000)
+      const minutes = Math.floor(totalSeconds / 60)
+      const seconds = totalSeconds % 60
+
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    },
+
+    showNotification(message, type = 'info') {
+      // Simple notification - could be enhanced with a proper notification system
+      console.log(`${type.toUpperCase()}: ${message}`)
+
+      if (window.electronAPI) {
+        window.electronAPI.invoke('notification:show', {
+          title: 'Focus Session',
+          body: message,
+          type
+        })
+      }
+    }
+  },
+
+  beforeUnmount() {
+    // Clean up timer when component is destroyed
+    if (this.focusTimer.timer) {
+      clearInterval(this.focusTimer.timer)
     }
   }
 }
@@ -558,11 +792,17 @@ export default {
   gap: 10px;
 }
 
-.settings-section, .stats-section, .events-section, .patterns-section {
+.settings-section,
+.stats-section,
+.events-section,
+.patterns-section {
   margin-bottom: 30px;
 }
 
-.settings-section h3, .stats-section h3, .events-section h3, .patterns-section h3 {
+.settings-section h3,
+.stats-section h3,
+.events-section h3,
+.patterns-section h3 {
   margin-bottom: 15px;
   color: #333;
 }
@@ -589,7 +829,8 @@ export default {
   margin-right: 8px;
 }
 
-.setting-input, .setting-select {
+.setting-input,
+.setting-select {
   width: 100%;
   max-width: 200px;
   padding: 8px 12px;
@@ -779,12 +1020,16 @@ export default {
   border-bottom: none;
 }
 
-.app-name, .hour-label, .day-name {
+.app-name,
+.hour-label,
+.day-name {
   font-weight: 500;
   color: #333;
 }
 
-.app-time, .hour-count, .day-score {
+.app-time,
+.hour-count,
+.day-score {
   color: #6c757d;
   font-size: 0.9em;
 }
@@ -857,8 +1102,12 @@ export default {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .icon-refresh::before {

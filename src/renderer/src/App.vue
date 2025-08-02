@@ -6,6 +6,8 @@ import ActivityLog from './components/ActivityLog.vue'
 import AppCategorization from '../components/AppCategorization.vue'
 import DistractionManagement from '../components/DistractionManagement.vue'
 import FocusSession from '../components/FocusSession.vue'
+import PatternAnalysis from '../components/PatternAnalysis.vue'
+import GoalTracking from '../components/GoalTracking.vue'
 
 const activeTab = ref('dashboard')
 const isTracking = ref(false)
@@ -15,7 +17,9 @@ const statusInterval = ref<NodeJS.Timeout | null>(null)
 const tabs = [
   { id: 'dashboard', name: 'Dashboard', icon: '📊' },
   { id: 'activity', name: 'Activity Log', icon: '📝' },
-  { id: 'focus', name: 'Focus Sessions', icon: '🎯' },
+  { id: 'patterns', name: 'Pattern Analysis', icon: '📈' },
+  { id: 'goals', name: 'Goal Tracking', icon: '🎯' },
+  { id: 'focus', name: 'Focus Sessions', icon: '⏱️' },
   { id: 'distraction', name: 'Distraction Management', icon: '🚫' },
   { id: 'categorization', name: 'App Categories', icon: '📂' },
   { id: 'settings', name: 'Settings', icon: '⚙️' }
@@ -91,11 +95,7 @@ onUnmounted(() => {
           <span class="app-label">Current:</span>
           <span class="app-name">{{ currentApp }}</span>
         </div>
-        <button 
-          class="track-button" 
-          :class="{ active: isTracking }"
-          @click="toggleTracking"
-        >
+        <button class="track-button" :class="{ active: isTracking }" @click="toggleTracking">
           {{ isTracking ? 'Stop Tracking' : 'Start Tracking' }}
         </button>
       </div>
@@ -103,8 +103,8 @@ onUnmounted(() => {
 
     <!-- Navigation -->
     <nav class="app-nav">
-      <button 
-        v-for="tab in tabs" 
+      <button
+        v-for="tab in tabs"
         :key="tab.id"
         class="nav-tab"
         :class="{ active: activeTab === tab.id }"
@@ -119,6 +119,8 @@ onUnmounted(() => {
     <main class="app-main">
       <Dashboard v-if="activeTab === 'dashboard'" key="dashboard" />
       <ActivityLog v-if="activeTab === 'activity'" />
+      <PatternAnalysis v-if="activeTab === 'patterns'" />
+      <GoalTracking v-if="activeTab === 'goals'" />
       <FocusSession v-if="activeTab === 'focus'" />
       <DistractionManagement v-if="activeTab === 'distraction'" />
       <AppCategorization v-if="activeTab === 'categorization'" />
