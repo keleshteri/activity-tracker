@@ -29,6 +29,51 @@ const api = {
     getActivities: (filters?: any) => ipcRenderer.invoke('activity:get-activities', filters)
   },
 
+  // Insights APIs
+  insights: {
+    getProductivity: (limit?: number) => ipcRenderer.invoke('insights:get-productivity', limit),
+    getAll: (category?: string, limit?: number) => ipcRenderer.invoke('insights:get-all', category, limit),
+    generate: (timeRange: { start: number, end: number }) => ipcRenderer.invoke('insights:generate', timeRange)
+  },
+
+  // App Categories APIs
+  appCategories: {
+    getAll: () => ipcRenderer.invoke('app-categories:get-all'),
+    save: (category: any) => ipcRenderer.invoke('app-categories:save', category),
+    delete: (appName: string) => ipcRenderer.invoke('app-categories:delete', appName),
+    getSuggestions: () => ipcRenderer.invoke('app-categories:get-suggestions'),
+    applySuggestions: (suggestions: any[]) => ipcRenderer.invoke('app-categories:apply-suggestions', suggestions)
+  },
+
+  // Distraction Management APIs
+  distraction: {
+    getSettings: () => ipcRenderer.invoke('distraction:get-settings'),
+    saveSettings: (settings: any) => ipcRenderer.invoke('distraction:save-settings', settings),
+    getEvents: (filters?: any) => ipcRenderer.invoke('distraction:get-events', filters)
+  },
+
+  // Focus Session APIs
+  focusSession: {
+    start: (sessionConfig: any) => ipcRenderer.invoke('focus-session:start', sessionConfig),
+    stop: () => ipcRenderer.invoke('focus-session:stop'),
+    getCurrent: () => ipcRenderer.invoke('focus-session:get-current'),
+    getHistory: (filters?: any) => ipcRenderer.invoke('focus-session:get-history', filters),
+    getAnalytics: () => ipcRenderer.invoke('focus-session:get-analytics'),
+    getSettings: () => ipcRenderer.invoke('focus-session:get-settings'),
+    saveSettings: (settings: any) => ipcRenderer.invoke('focus-session:save-settings', settings),
+    pause: () => ipcRenderer.invoke('focus-session:pause'),
+    resume: () => ipcRenderer.invoke('focus-session:resume'),
+    recordInterruption: (interruption: any) => ipcRenderer.invoke('focus-session:record-interruption', interruption)
+  },
+
+  // Goals APIs
+  goals: {
+    getAll: () => ipcRenderer.invoke('goals:get-all'),
+    save: (goal: any) => ipcRenderer.invoke('goals:save', goal),
+    delete: (goalId: string) => ipcRenderer.invoke('goals:delete', goalId),
+    getProgress: (goalId: string) => ipcRenderer.invoke('goals:get-progress', goalId)
+  },
+
   // Shell APIs
   shell: {
     openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path)
@@ -62,6 +107,34 @@ const api = {
   // Notification APIs
   notification: {
     test: (message?: string) => ipcRenderer.invoke('notification:test', message)
+  },
+
+  // Platform APIs
+  platform: {
+    getInfo: () => ipcRenderer.invoke('platform:get-info'),
+    getCapabilities: () => ipcRenderer.invoke('platform:get-capabilities'),
+    getTheme: () => ipcRenderer.invoke('platform:get-theme'),
+    showNotification: (title: string, body: string, options?: any) => 
+      ipcRenderer.invoke('platform:show-notification', title, body, options),
+    openFileManager: (path?: string) => ipcRenderer.invoke('platform:open-file-manager', path),
+    showItemInFolder: (filePath: string) => ipcRenderer.invoke('platform:show-item-in-folder', filePath)
+  },
+
+  // Auto-updater APIs
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke('updater:check-for-updates'),
+    downloadUpdate: () => ipcRenderer.invoke('updater:download-update'),
+    quitAndInstall: () => ipcRenderer.invoke('updater:quit-and-install'),
+    getStatus: () => ipcRenderer.invoke('updater:get-status')
+  },
+
+  // Tray APIs
+  tray: {
+    showNotification: (title: string, body: string, options?: any) => 
+      ipcRenderer.invoke('tray:show-notification', title, body, options),
+    getCapabilities: () => ipcRenderer.invoke('tray:get-capabilities'),
+    enableMenuBarMode: () => ipcRenderer.invoke('tray:enable-menubar-mode'),
+    disableMenuBarMode: () => ipcRenderer.invoke('tray:disable-menubar-mode')
   },
 
   // Utility APIs
@@ -129,6 +202,14 @@ export type TrackerAPI = typeof api.tracker
 export type DashboardAPI = typeof api.dashboard
 export type DataAPI = typeof api.data
 export type ActivityAPI = typeof api.activity
+export type InsightsAPI = typeof api.insights
+export type AppCategoriesAPI = typeof api.appCategories
+export type DistractionAPI = typeof api.distraction
+export type FocusSessionAPI = typeof api.focusSession
+export type GoalsAPI = typeof api.goals
 export type DatabaseAPI = typeof api.database
 export type FileAPI = typeof api.file
 export type NotificationAPI = typeof api.notification
+export type PlatformAPI = typeof api.platform
+export type UpdaterAPI = typeof api.updater
+export type TrayAPI = typeof api.tray

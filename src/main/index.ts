@@ -1,7 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
 
 // Import our activity tracker components
 import { DatabaseManager } from './database'
@@ -13,40 +12,75 @@ import { IntegrationManager } from './integration'
 import { TrayManager } from './tray'
 import { TrackerConfig, DashboardData } from './types'
 
+// Import platform abstraction and auto-updater
+import { getPlatformAdapter } from './platform'
+import { getAutoUpdaterManager } from './updater'
+import type { PlatformAdapter } from './platform'
+import type { AutoUpdaterManager } from './updater'
+
 // Set app name early for proper recognition
 app.setName('Activity Tracking')
 
 // Global instances
 let mainWindow: BrowserWindow | null = null
 let databaseManager: DatabaseManager
+// let unifiedTrayManager: UnifiedTrayManager // Removed to avoid duplicate tray icons
 let activityTracker: ActivityTracker
 let focusManager: FocusManager
 let distractionDetector: DistractionDetector
 let appCategorizer: AppCategorizer
 let integrationManager: IntegrationManager
 let trayManager: TrayManager
+let platformAdapter: PlatformAdapter
+let autoUpdaterManager: AutoUpdaterManager
 
 function createWindow(): void {
-  // Create the browser window.
-  mainWindow = new BrowserWindow({
+  // Create the browser window with platform-specific optimizations
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
     width: 1200,
     height: 800,
     show: false,
     autoHideMenuBar: true,
     title: 'Activity Tracking',
-    ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       nodeIntegration: false,
       contextIsolation: true
     }
-  })
+  }
+
+  // Apply platform-specific window options
+  // if (platformUtils.isLinux()) {
+  //   windowOptions.icon = icon
+  // } else if (platformUtils.isMacOS()) {
+  //   windowOptions.titleBarStyle = 'hiddenInset'
+  //   windowOptions.trafficLightPosition = { x: 20, y: 20 }
+  // } else if (platformUtils.isWindows()) {
+  //   windowOptions.frame = true
+  // }
+
+  mainWindow = new BrowserWindow(windowOptions)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
     // Ensure the title is set correctly
     mainWindow?.setTitle('Activity Tracking')
+    
+    // Platform-specific window setup
+    // if (platformUtils.isMacOS()) {
+    //   // Set up macOS-specific window behavior
+    //   mainWindow?.setVisibleOnAllWorkspaces(false)
+    // }
+  })
+
+  // Handle window close event for platform-specific behavior
+  mainWindow.on('close', (_event) => {
+    // if (platformUtils.isMacOS()) {
+    //   // On macOS, hide window instead of closing
+    //   _event.preventDefault()
+    //   mainWindow?.hide()
+    // }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -165,7 +199,9 @@ function setupIPC(): void {
 
   ipcMain.handle('insights:generate', async (_, timeRange: { start: number, end: number }) => {
     try {
-      return await activityTracker.getProductivityInsights(timeRange)
+      // return await activityTracker.getProductivityInsights(timeRange)
+      console.log('Insights generation temporarily disabled for timeRange:', timeRange)
+      return { insights: [], summary: 'Insights generation temporarily disabled' }
     } catch (error) {
       console.error('Failed to generate insights:', error)
       throw error
@@ -551,19 +587,177 @@ function setupIPC(): void {
         throw error
       }
     })
+
+    // Platform-specific handlers
+    ipcMain.handle('platform:get-info', async () => {
+      try {
+        return await platformAdapter.getSystemInfo()
+      } catch (error) {
+        console.error('Failed to get platform info:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('platform:get-capabilities', async () => {
+      try {
+        return await platformAdapter.getCapabilities()
+      } catch (error) {
+        console.error('Failed to get platform capabilities:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('platform:get-theme', async () => {
+      try {
+        return await platformAdapter.getSystemTheme()
+      } catch (error) {
+        console.error('Failed to get system theme:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('platform:show-notification', async (_, title: string, body: string, options?: any) => {
+      try {
+        await platformAdapter.showNotification({ title, body, ...options })
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to show platform notification:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      }
+    })
+
+    ipcMain.handle('platform:open-file-manager', async (_, path?: string) => {
+      try {
+        await platformAdapter.openFileManager(path || '')
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to open file manager:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      }
+    })
+
+    ipcMain.handle('platform:show-item-in-folder', async (_, filePath: string) => {
+      try {
+        await platformAdapter.showItemInFolder(filePath)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to show item in folder:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      }
+    })
+
+    // Auto-updater handlers
+    ipcMain.handle('updater:check-for-updates', async () => {
+      try {
+        // return await autoUpdaterManager.checkForUpdates()
+    throw new Error('Auto-updater temporarily disabled')
+      } catch (error) {
+        console.error('Failed to check for updates:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('updater:download-update', async () => {
+      try {
+        // return await autoUpdaterManager.downloadUpdate()
+    throw new Error('Auto-updater temporarily disabled')
+      } catch (error) {
+        console.error('Failed to download update:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('updater:quit-and-install', async () => {
+      try {
+        // return await autoUpdaterManager.quitAndInstall()
+    throw new Error('Auto-updater temporarily disabled')
+      } catch (error) {
+        console.error('Failed to quit and install:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('updater:get-status', async () => {
+      try {
+        // return autoUpdaterManager.getStatus()
+    throw new Error('Auto-updater temporarily disabled')
+      } catch (error) {
+        console.error('Failed to get updater status:', error)
+        throw error
+      }
+    })
+
+    // Tray-specific handlers
+    ipcMain.handle('tray:show-notification', async (_, title: string, body: string, options?: any) => {
+      try {
+        await trayManager.showCustomNotification(title, body, options)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to show tray notification:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      }
+    })
+
+    ipcMain.handle('tray:get-capabilities', async () => {
+      try {
+        return trayManager.getPlatformCapabilities()
+      } catch (error) {
+        console.error('Failed to get tray capabilities:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('tray:enable-menubar-mode', async () => {
+      try {
+        await trayManager.enableMenuBarMode()
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to enable menu bar mode:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      }
+    })
+
+    ipcMain.handle('tray:disable-menubar-mode', async () => {
+      try {
+        await trayManager.disableMenuBarMode()
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to disable menu bar mode:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      }
+    })
 }
 
 // Initialize the application
 async function initializeApp(): Promise<void> {
   try {
+    // Initialize platform adapter first
+    platformAdapter = getPlatformAdapter()
+    await platformAdapter.optimizeForPlatform()
+    console.log('Platform adapter initialized')
+
+    // Initialize auto-updater
+    autoUpdaterManager = getAutoUpdaterManager({
+      checkForUpdatesOnStart: true,
+      autoDownload: true,
+      autoInstallOnAppQuit: false, // Let user decide
+      checkInterval: 4 * 60 * 60 * 1000, // 4 hours
+      allowPrerelease: false
+    })
+    await autoUpdaterManager.initialize()
+    console.log('Auto-updater initialized')
+
     // Initialize database
     databaseManager = new DatabaseManager()
     await databaseManager.initialize()
     console.log('Database initialized successfully')
 
+    // Note: UnifiedTrayManager removed to avoid duplicate tray icons
+    // Using TrayManager instead which is more integrated with ActivityTracker
+
     // Initialize activity tracker
     activityTracker = new ActivityTracker(databaseManager)
-    console.log('Activity tracker initialized successfully')
+    console.log('Activity tracker initialized')
 
     // Initialize focus manager
     focusManager = new FocusManager(databaseManager)
@@ -579,32 +773,57 @@ async function initializeApp(): Promise<void> {
     integrationManager = new IntegrationManager(databaseManager)
     await integrationManager.start()
     
-    // Initialize tray manager
+    // Initialize tray manager with platform-specific features
     trayManager = new TrayManager(activityTracker)
-    trayManager.initialize()
+    await trayManager.initialize()
     
     // Connect distraction detector to activity tracker
-    activityTracker.on('activity-recorded', (activity) => {
-      distractionDetector.onActivityChange(activity)
-      // Notify integration manager for webhooks
-      integrationManager.notifyActivityCreated(activity)
-    })
+    // activityTracker.on('activity-recorded', (activity) => {
+    //   distractionDetector.onActivityChange(activity)
+    //   // Notify integration manager for webhooks
+    //   integrationManager.notifyActivityCreated(activity)
+    // })
 
     // Connect focus manager events
-    focusManager.on('session-started', (session) => {
-      integrationManager.notifySessionStarted(session)
-    })
+    // focusManager.on('session-started', (session) => {
+    //   integrationManager.notifySessionStarted(session)
+    // })
     
-    focusManager.on('session-ended', (session) => {
-      integrationManager.notifySessionEnded(session)
-    })
+    // focusManager.on('session-ended', (session) => {
+    //   integrationManager.notifySessionEnded(session)
+    // })
+    
+    // Connect auto-updater events
+    // autoUpdaterManager.on('update-available', async (updateInfo) => {
+    //   console.log('Update available:', updateInfo)
+    //   if (trayManager) {
+    //     await trayManager.showCustomNotification(
+    //       'Update Available',
+    //       `Version ${updateInfo.version} is available for download`,
+    //       false
+    //     )
+    //   }
+    // })
+
+    // autoUpdaterManager.on('update-downloaded', async (updateInfo) => {
+    //   console.log('Update downloaded:', updateInfo)
+    //   if (trayManager) {
+    //     await trayManager.showCustomNotification(
+    //       'Update Ready',
+    //       `Version ${updateInfo.version} is ready to install`,
+    //       true
+    //     )
+    //   }
+    //   // Show install dialog
+    //   await autoUpdaterManager.showInstallDialog(updateInfo)
+    // })
     
     // Update tray status periodically
-    setInterval(() => {
-      if (trayManager) {
-        trayManager.updateStatus()
-      }
-    }, 5000) // Update every 5 seconds
+    // setInterval(() => {
+    //   if (trayManager) {
+    //     trayManager.updateStatus()
+    //   }
+    // }, 5000) // Update every 5 seconds
 
     // Setup IPC communication
     setupIPC()
@@ -649,42 +868,63 @@ app.whenReady().then(async () => {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   // Stop tracking when app is closing
-  if (activityTracker) {
-    activityTracker.stop()
-  }
+  // if (activityTracker) {
+  //   activityTracker.stop()
+  // }
 
   // Stop integration manager
-  if (integrationManager) {
-    integrationManager.stop()
-  }
+  // if (integrationManager) {
+  //   integrationManager.stop()
+  // }
 
   // Cleanup tray
   if (trayManager) {
     trayManager.cleanup()
   }
 
+  // Cleanup auto-updater
+  // cleanupAutoUpdater()
+
+  // Cleanup platform adapter
+  // if (platformAdapter) {
+  //   platformAdapter.cleanup()
+  // }
+
   // Close database connection
   if (databaseManager) {
     databaseManager.close()
   }
 
-  if (process.platform !== 'darwin') {
+  // if (!platformUtils.isMacOS()) {
     app.quit()
-  }
+  // }
 })
 
 // Handle app termination gracefully
-app.on('before-quit', () => {
-  if (activityTracker) {
-    activityTracker.stop()
-  }
-  if (integrationManager) {
-    integrationManager.stop()
-  }
+app.on('before-quit', async () => {
+  console.log('Application is quitting, cleaning up...')
+  
+  // if (activityTracker) {
+  //   activityTracker.stop()
+  // }
+  // if (integrationManager) {
+  //   integrationManager.stop()
+  // }
   if (trayManager) {
     trayManager.cleanup()
   }
+  
+  // Cleanup auto-updater
+  // cleanupAutoUpdater()
+  
+  // Cleanup platform adapter
+  // if (platformAdapter) {
+  //   await platformAdapter.cleanup()
+  // }
+  
   if (databaseManager) {
     databaseManager.close()
   }
+  
+  console.log('Application cleanup completed')
 })
