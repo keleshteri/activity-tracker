@@ -137,7 +137,7 @@ function setupIPC(): void {
   })
 
   // Export data
-  ipcMain.handle('data:export', async (_, _format: 'json' | 'csv') => {
+  ipcMain.handle('data:export', async (_event, _format: 'json' | 'csv') => {
     // TODO: Implement data export functionality
     return { success: false, error: 'Export not implemented yet' }
   })
@@ -370,7 +370,7 @@ function setupIPC(): void {
     // Database API handlers
     ipcMain.handle('database:save-user-preference', async (_, key: string, value: any, type?: string) => {
       try {
-        await databaseManager.saveUserPreference(key, value, type)
+        await databaseManager.saveUserPreference(key, value, type as 'string' | 'number' | 'boolean' | 'json')
         return { success: true }
       } catch (error) {
         console.error('Failed to save user preference:', error)
@@ -387,7 +387,7 @@ function setupIPC(): void {
       }
     })
 
-    ipcMain.handle('database:get-all-user-preferences', async () => {
+    ipcMain.handle('database:get-all-user-preferences', async (_event) => {
       try {
         return await databaseManager.getAllUserPreferences()
       } catch (error) {
@@ -406,7 +406,7 @@ function setupIPC(): void {
       }
     })
 
-    ipcMain.handle('database:get-privacy-settings', async () => {
+    ipcMain.handle('database:get-privacy-settings', async (_event) => {
       try {
         return await databaseManager.getPrivacySettings()
       } catch (error) {
@@ -425,7 +425,7 @@ function setupIPC(): void {
       }
     })
 
-    ipcMain.handle('database:get-distraction-settings', async () => {
+    ipcMain.handle('database:get-distraction-settings', async (_event) => {
       try {
         return await databaseManager.getDistractionSettings()
       } catch (error) {
@@ -533,8 +533,7 @@ function setupIPC(): void {
     // Webhook handlers
     ipcMain.handle('webhook:list', async () => {
       try {
-        const api = integrationManager.getAPI()
-        return api.getConfig().webhooks.endpoints
+        return integrationManager.getConfig().api.webhooks.endpoints
       } catch (error) {
         console.error('Failed to get webhooks:', error)
         throw error

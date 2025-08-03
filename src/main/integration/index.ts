@@ -1,7 +1,7 @@
 import { ipcMain, app, dialog } from 'electron'
 import { DatabaseManager } from '../database'
-import { ExportManager, ExportFilters, ExportResult, BackupResult, ImportResult, AutoExportConfig } from '../export'
-import { IntegrationAPI, APIConfig, defaultAPIConfig, WebhookEvent } from '../api'
+import { ExportManager, ExportFilters, AutoExportConfig } from '../export'
+import { IntegrationAPI, APIConfig, defaultAPIConfig } from '../api'
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 
@@ -20,7 +20,7 @@ export interface IntegrationConfig {
 }
 
 export class IntegrationManager {
-  private databaseManager: DatabaseManager
+
   private exportManager: ExportManager
   private api: IntegrationAPI
   private config: IntegrationConfig
@@ -28,7 +28,6 @@ export class IntegrationManager {
   private backupScheduleJob: any
 
   constructor(databaseManager: DatabaseManager) {
-    this.databaseManager = databaseManager
     this.exportManager = new ExportManager(databaseManager)
     this.configPath = join(app.getPath('userData'), 'integration-config.json')
     this.config = this.loadConfig()
@@ -81,7 +80,7 @@ export class IntegrationManager {
 
   private setupIPC(): void {
     // Export functionality
-    ipcMain.handle('export:json', async (event, filters: ExportFilters) => {
+    ipcMain.handle('export:json', async (_event, filters: ExportFilters) => {
       try {
         return await this.exportManager.exportToJSON(filters)
       } catch (error) {
@@ -92,7 +91,7 @@ export class IntegrationManager {
       }
     })
 
-    ipcMain.handle('export:csv', async (event, filters: ExportFilters) => {
+    ipcMain.handle('export:csv', async (_event, filters: ExportFilters) => {
       try {
         return await this.exportManager.exportToCSV(filters)
       } catch (error) {
@@ -103,7 +102,7 @@ export class IntegrationManager {
       }
     })
 
-    ipcMain.handle('export:productivity-report', async (event, format: 'pdf' | 'html' | 'json', period: any) => {
+    ipcMain.handle('export:productivity-report', async (_event, format: 'pdf' | 'html' | 'json', period: any) => {
       try {
         return await this.exportManager.generateProductivityReport(format, period)
       } catch (error) {
@@ -132,7 +131,7 @@ export class IntegrationManager {
     })
 
     // Backup functionality
-    ipcMain.handle('backup:create', async (event, options: any) => {
+    ipcMain.handle('backup:create', async (_event, options: any) => {
       try {
         return await this.exportManager.createBackup(options)
       } catch (error) {
@@ -144,7 +143,7 @@ export class IntegrationManager {
       }
     })
 
-    ipcMain.handle('backup:restore', async (event, backupPath: string, options: any) => {
+    ipcMain.handle('backup:restore', async (_event, backupPath: string, options: any) => {
       try {
         return await this.exportManager.restoreBackup(backupPath, options)
       } catch (error) {
@@ -188,7 +187,7 @@ export class IntegrationManager {
       return this.config
     })
 
-    ipcMain.handle('integration:update-config', (event, newConfig: Partial<IntegrationConfig>) => {
+    ipcMain.handle('integration:update-config', (_event, newConfig: Partial<IntegrationConfig>) => {
       try {
         this.config = { ...this.config, ...newConfig }
         this.saveConfig()
@@ -239,7 +238,7 @@ export class IntegrationManager {
       }
     })
 
-    ipcMain.handle('api:create-key', async (event, keyData: any) => {
+    ipcMain.handle('api:create-key', async (_event, _keyData: any) => {
       try {
         // This would typically be handled through the API itself
         // For now, return a placeholder response
@@ -260,7 +259,7 @@ export class IntegrationManager {
       return this.config.api.webhooks.endpoints
     })
 
-    ipcMain.handle('webhooks:create', (event, webhook: any) => {
+    ipcMain.handle('webhooks:create', (_event, webhook: any) => {
       try {
         const newWebhook = {
           id: require('uuid').v4(),
@@ -280,7 +279,7 @@ export class IntegrationManager {
       }
     })
 
-    ipcMain.handle('webhooks:update', (event, webhookId: string, updates: any) => {
+    ipcMain.handle('webhooks:update', (_event, webhookId: string, updates: any) => {
       try {
         const index = this.config.api.webhooks.endpoints.findIndex(w => w.id === webhookId)
         if (index === -1) {
@@ -302,7 +301,7 @@ export class IntegrationManager {
       }
     })
 
-    ipcMain.handle('webhooks:delete', (event, webhookId: string) => {
+    ipcMain.handle('webhooks:delete', (_event, webhookId: string) => {
       try {
         const index = this.config.api.webhooks.endpoints.findIndex(w => w.id === webhookId)
         if (index === -1) {
@@ -321,7 +320,7 @@ export class IntegrationManager {
       }
     })
 
-    ipcMain.handle('webhooks:test', async (event, webhookId: string) => {
+    ipcMain.handle('webhooks:test', async (_event, webhookId: string) => {
       try {
         const webhook = this.config.api.webhooks.endpoints.find(w => w.id === webhookId)
         if (!webhook) {
@@ -345,7 +344,7 @@ export class IntegrationManager {
     })
 
     // Auto-export management
-    ipcMain.handle('auto-export:enable', (event, config: AutoExportConfig) => {
+    ipcMain.handle('auto-export:enable', (_event, config: AutoExportConfig) => {
       try {
         this.config.autoExport = config
         this.saveConfig()

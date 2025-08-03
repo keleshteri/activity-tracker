@@ -123,14 +123,6 @@
 </template>
 
 <script lang="ts">
-// Type declaration for electronAPI
-declare global {
-  interface Window {
-    electronAPI?: {
-      invoke: (channel: string, ...args: any[]) => Promise<any>
-    }
-  }
-}
 
 // Interface definitions
 interface Insight {
@@ -187,22 +179,22 @@ export default {
         // Check if electronAPI is available (Electron mode vs web preview mode)
         if (window.electronAPI && window.electronAPI.invoke) {
           // Load productivity insights
-          const productivityInsights = await window.electronAPI.invoke('insights:get-productivity', 10)
+          const productivityInsights = await window.electronAPI.invoke('insights:get-productivity', 10) as any[]
           
           // Load general insights
-          const allInsights = await window.electronAPI.invoke('insights:get-all', null, 20)
+          const allInsights = await window.electronAPI.invoke('insights:get-all', null, 20) as any[]
           
           // Generate new insights for current time range
           const timeRange = {
             start: Date.now() - (7 * 24 * 60 * 60 * 1000), // Last 7 days
             end: Date.now()
           }
-          const generatedInsights = await window.electronAPI.invoke('insights:generate', timeRange)
+          const generatedInsights = await window.electronAPI.invoke('insights:generate', timeRange) as any[]
           
           this.insights = [...productivityInsights, ...allInsights, ...generatedInsights]
           
           // Load dashboard data for metrics
-          const dashboardData = await window.electronAPI.invoke('dashboard:get-data')
+          const dashboardData = await window.electronAPI.invoke('dashboard:get-data') as DashboardData
           this.updateMetrics(dashboardData)
         } else {
           // Fallback mock data for web preview mode

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 
 interface TrackerConfig {
   screenshotInterval: number
@@ -313,7 +313,7 @@ const removeExcludedDomain = (index: number) => {
 
 const selectBackupLocation = async () => {
   try {
-    const result = await window.api.dialog.showOpenDialog({
+    const result = await window.dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Select Backup Location'
     })
@@ -344,7 +344,7 @@ const performBackup = async () => {
 const cleanupOldData = async () => {
   if (confirm(`Are you sure you want to delete data older than ${dataManagementSettings.value.cleanupIntervalDays} days?`)) {
     try {
-      const cutoffDate = Date.now() - (dataManagementSettings.value.cleanupIntervalDays * 24 * 60 * 60 * 1000)
+      const cutoffDate = new Date(Date.now() - (dataManagementSettings.value.cleanupIntervalDays * 24 * 60 * 60 * 1000))
       await window.api.database.cleanupOldData(cutoffDate)
       showMessage('Old data cleaned up successfully', 'success')
     } catch (error) {
@@ -355,8 +355,8 @@ const cleanupOldData = async () => {
 }
 
 const testNotification = () => {
-  if (window.api && window.api.notifications) {
-    window.api.notifications.show({
+  if (window.api && window.api.notification) {
+    window.api.notification.show({
       title: 'Test Notification',
       body: 'This is a test notification to verify your settings.',
       type: notificationSettings.value.notificationStyle

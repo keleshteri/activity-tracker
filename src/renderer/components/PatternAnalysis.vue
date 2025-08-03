@@ -177,15 +177,6 @@ import {
 } from 'chart.js'
 import { Bar } from 'vue-chartjs'
 
-// Type declaration for electronAPI
-declare global {
-  interface Window {
-    electronAPI?: {
-      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
-    }
-  }
-}
-
 // Interface definitions
 interface Activity {
   id: string

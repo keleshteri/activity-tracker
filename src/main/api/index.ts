@@ -2,19 +2,10 @@ import express, { Request, Response, NextFunction } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
-import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import { v4 as uuidv4 } from 'uuid'
 import { DatabaseManager } from '../database'
 import { ExportManager } from '../export'
-import {
-  ActivityRecord,
-  ProductivityMetrics,
-  WorkSession,
-  DashboardData,
-  AppCategory,
-  ProductivityInsight
-} from '../types'
 
 export interface APIConfig {
   port: number
@@ -138,7 +129,7 @@ export class IntegrationAPI {
     this.app.use(express.urlencoded({ extended: true }))
 
     // Request logging
-    this.app.use((req, res, next) => {
+    this.app.use((req, _res, next) => {
       console.log(`${new Date().toISOString()} ${req.method} ${req.path}`)
       next()
     })
@@ -146,12 +137,12 @@ export class IntegrationAPI {
 
   private setupRoutes(): void {
     // Health check
-    this.app.get('/health', (req, res) => {
+    this.app.get('/health', (_req, res) => {
       res.json({ status: 'ok', timestamp: Date.now() })
     })
 
     // API documentation
-    this.app.get('/api/docs', (req, res) => {
+    this.app.get('/api/docs', (_req, res) => {
       res.json(this.generateAPIDocumentation())
     })
 
@@ -235,15 +226,7 @@ export class IntegrationAPI {
     })
   }
 
-  private checkPermission(permission: APIPermission) {
-    return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-      if (!req.user?.permissions.includes(permission) && !req.user?.permissions.includes('admin:all')) {
-        res.status(403).json({ error: `Permission required: ${permission}` })
-        return
-      }
-      next()
-    }
-  }
+
 
   // API Key management
   private async createAPIKey(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -283,7 +266,7 @@ export class IntegrationAPI {
     }
   }
 
-  private async listAPIKeys(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async listAPIKeys(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const keys = Array.from(this.apiKeys.values()).map(({ key, hashedKey, ...apiKey }) => apiKey)
       res.json({ keys })
@@ -411,13 +394,12 @@ export class IntegrationAPI {
         return
       }
 
-      const { startTime, endTime, limit = 50, offset = 0 } = req.query
+      const { startTime, endTime, limit = 50 } = req.query
 
       const sessions = await this.databaseManager.getWorkSessions({
         startTime: startTime ? parseInt(startTime as string) : undefined,
         endTime: endTime ? parseInt(endTime as string) : undefined,
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string)
+        limit: parseInt(limit as string)
       })
 
       res.json({ sessions })
@@ -433,12 +415,11 @@ export class IntegrationAPI {
         return
       }
 
-      const { startDate, endDate, granularity = 'day' } = req.query
+      const { startDate, endDate } = req.query
 
       const metrics = await this.databaseManager.getProductivityMetrics({
         startDate: startDate as string,
-        endDate: endDate as string,
-        granularity: granularity as 'hour' | 'day' | 'week' | 'month'
+        endDate: endDate as string
       })
 
       res.json({ metrics })
@@ -454,13 +435,12 @@ export class IntegrationAPI {
         return
       }
 
-      const { startTime, endTime, type } = req.query
+      const { type } = req.query
 
-      const insights = await this.databaseManager.getInsights({
-        startTime: startTime ? parseInt(startTime as string) : undefined,
-        endTime: endTime ? parseInt(endTime as string) : undefined,
-        type: type as string
-      })
+      const insights = await this.databaseManager.getInsights(
+        type as string,
+        20
+      )
 
       res.json({ insights })
     } catch (error) {
@@ -468,7 +448,7 @@ export class IntegrationAPI {
     }
   }
 
-  private async getDashboard(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async getDashboard(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const dashboard = await this.databaseManager.getDashboardData()
       res.json({ dashboard })
@@ -477,7 +457,7 @@ export class IntegrationAPI {
     }
   }
 
-  private async getCategories(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async getCategories(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const categories = await this.databaseManager.getAppCategories()
       res.json({ categories })
@@ -486,7 +466,7 @@ export class IntegrationAPI {
     }
   }
 
-  private async getConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async getConfig(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const config = await this.databaseManager.getConfig()
       res.json({ config })
@@ -510,7 +490,7 @@ export class IntegrationAPI {
     }
   }
 
-  private async getCurrentActivity(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async getCurrentActivity(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const currentActivity = await this.databaseManager.getCurrentActivity()
       res.json({ currentActivity })
@@ -519,7 +499,7 @@ export class IntegrationAPI {
     }
   }
 
-  private async getSystemStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async getSystemStatus(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const status = {
         isTracking: true, // Would get from tracker
@@ -534,7 +514,7 @@ export class IntegrationAPI {
   }
 
   // Webhook management
-  private async getWebhooks(req: AuthenticatedRequest, res: Response): Promise<void> {
+  private async getWebhooks(_req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       res.json({ webhooks: this.config.webhooks.endpoints })
     } catch (error) {

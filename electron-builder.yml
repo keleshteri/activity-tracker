@@ -11,6 +11,8 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  - node_modules/archiver/**
+  - node_modules/archiver-utils/**
 win:
   executableName: activity-tracker
 nsis:
@@ -37,7 +39,7 @@ linux:
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
-npmRebuild: false
+npmRebuild: true
 publish:
   provider: github
   owner: keleshteri

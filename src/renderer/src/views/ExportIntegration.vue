@@ -371,7 +371,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useNotification } from '../composables/useNotification'
 
 const { showNotification } = useNotification()
@@ -430,12 +430,21 @@ const apiStatus = reactive({
 })
 
 // Webhooks state
-const webhooks = ref([])
+interface Webhook {
+  id: string
+  url: string
+  events: string[]
+  secret?: string
+  timeout?: number
+  active?: boolean
+}
+
+const webhooks = ref<Webhook[]>([])
 const showWebhookModal = ref(false)
-const editingWebhook = ref(null)
+const editingWebhook = ref<Webhook | null>(null)
 const webhookForm = reactive({
   url: '',
-  events: [],
+  events: [] as string[],
   secret: '',
   timeout: 5000
 })
@@ -458,6 +467,11 @@ const progressDetails = ref('')
 // Methods
 const exportData = async () => {
   try {
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
+      return
+    }
+    
     isExporting.value = true
     showProgressModal.value = true
     progressMessage.value = 'Exporting data...'
@@ -483,7 +497,8 @@ const exportData = async () => {
       showNotification(`Export failed: ${result.error}`, 'error')
     }
   } catch (error) {
-    showNotification(`Export failed: ${error.message}`, 'error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    showNotification(`Export failed: ${errorMessage}`, 'error')
   } finally {
     isExporting.value = false
     setTimeout(() => {
@@ -494,6 +509,11 @@ const exportData = async () => {
 
 const generateReport = async () => {
   try {
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
+      return
+    }
+    
     isGeneratingReport.value = true
     showProgressModal.value = true
     progressMessage.value = 'Generating productivity report...'
@@ -509,7 +529,8 @@ const generateReport = async () => {
       showNotification(`Report generation failed: ${result.error}`, 'error')
     }
   } catch (error) {
-    showNotification(`Report generation failed: ${error.message}`, 'error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    showNotification(`Report generation failed: ${errorMessage}`, 'error')
   } finally {
     isGeneratingReport.value = false
     setTimeout(() => {
@@ -520,6 +541,11 @@ const generateReport = async () => {
 
 const createBackup = async () => {
   try {
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
+      return
+    }
+    
     isCreatingBackup.value = true
     showProgressModal.value = true
     progressMessage.value = 'Creating backup...'
@@ -528,12 +554,15 @@ const createBackup = async () => {
     
     if (result.success) {
       showNotification('Backup created successfully', 'success')
-      progressDetails.value = `Backup size: ${(result.backupSize / 1024 / 1024).toFixed(1)} MB`
+      if (result.backupSize !== undefined) {
+        progressDetails.value = `Backup size: ${(result.backupSize / 1024 / 1024).toFixed(1)} MB`
+      }
     } else {
       showNotification(`Backup failed: ${result.error}`, 'error')
     }
   } catch (error) {
-    showNotification(`Backup failed: ${error.message}`, 'error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    showNotification(`Backup failed: ${errorMessage}`, 'error')
   } finally {
     isCreatingBackup.value = false
     setTimeout(() => {
@@ -544,6 +573,11 @@ const createBackup = async () => {
 
 const selectBackupFile = async () => {
   try {
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
+      return
+    }
+    
     const result = await window.electronAPI.selectBackupFile()
     if (!result.canceled && result.filePaths.length > 0) {
       const backupPath = result.filePaths[0]
@@ -567,21 +601,35 @@ const selectBackupFile = async () => {
       }, 2000)
     }
   } catch (error) {
-    showNotification(`Restore failed: ${error.message}`, 'error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    showNotification(`Restore failed: ${errorMessage}`, 'error')
     showProgressModal.value = false
   }
 }
 
 const openExportFolder = async () => {
+  if (!window.electronAPI) {
+    showNotification('API not available', 'error')
+    return
+  }
   await window.electronAPI.openExportFolder()
 }
 
 const openBackupFolder = async () => {
+  if (!window.electronAPI) {
+    showNotification('API not available', 'error')
+    return
+  }
   await window.electronAPI.openBackupFolder()
 }
 
 const toggleAPI = async () => {
   try {
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
+      return
+    }
+    
     if (apiStatus.running) {
       await window.electronAPI.stopAPI()
       apiStatus.running = false
@@ -590,14 +638,17 @@ const toggleAPI = async () => {
       const result = await window.electronAPI.startAPI()
       if (result.success) {
         apiStatus.running = true
-        apiStatus.port = result.port
+        if (result.port !== undefined) {
+          apiStatus.port = result.port
+        }
         showNotification(`API server started on port ${result.port}`, 'success')
       } else {
         showNotification(`Failed to start API: ${result.error}`, 'error')
       }
     }
   } catch (error) {
-    showNotification(`API operation failed: ${error.message}`, 'error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    showNotification(`API operation failed: ${errorMessage}`, 'error')
   }
 }
 
@@ -607,14 +658,25 @@ const openAPIDocumentation = () => {
 
 const loadWebhooks = async () => {
   try {
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
+      return
+    }
+    
     webhooks.value = await window.electronAPI.listWebhooks()
   } catch (error) {
-    console.error('Failed to load webhooks:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Failed to load webhooks:', errorMessage)
   }
 }
 
 const testWebhook = async (webhookId: string) => {
   try {
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
+      return
+    }
+    
     const result = await window.electronAPI.testWebhook(webhookId)
     if (result.success) {
       showNotification('Webhook test successful', 'success')
@@ -622,7 +684,8 @@ const testWebhook = async (webhookId: string) => {
       showNotification('Webhook test failed', 'error')
     }
   } catch (error) {
-    showNotification(`Webhook test failed: ${error.message}`, 'error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    showNotification(`Webhook test failed: ${errorMessage}`, 'error')
   }
 }
 
@@ -638,6 +701,11 @@ const editWebhook = (webhook: any) => {
 const deleteWebhook = async (webhookId: string) => {
   if (confirm('Are you sure you want to delete this webhook?')) {
     try {
+      if (!window.electronAPI) {
+        showNotification('API not available', 'error')
+        return
+      }
+      
       const result = await window.electronAPI.deleteWebhook(webhookId)
       if (result.success) {
         showNotification('Webhook deleted successfully', 'success')
@@ -646,7 +714,8 @@ const deleteWebhook = async (webhookId: string) => {
         showNotification(`Failed to delete webhook: ${result.error}`, 'error')
       }
     } catch (error) {
-      showNotification(`Failed to delete webhook: ${error.message}`, 'error')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      showNotification(`Failed to delete webhook: ${errorMessage}`, 'error')
     }
   }
 }
@@ -655,6 +724,11 @@ const saveWebhook = async () => {
   try {
     if (!webhookForm.url || webhookForm.events.length === 0) {
       showNotification('Please fill in all required fields', 'error')
+      return
+    }
+    
+    if (!window.electronAPI) {
+      showNotification('API not available', 'error')
       return
     }
     
@@ -676,7 +750,8 @@ const saveWebhook = async () => {
       showNotification(`Failed to save webhook: ${result.error}`, 'error')
     }
   } catch (error) {
-    showNotification(`Failed to save webhook: ${error.message}`, 'error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    showNotification(`Failed to save webhook: ${errorMessage}`, 'error')
   }
 }
 
@@ -691,6 +766,10 @@ const closeWebhookModal = () => {
 
 const loadAPIStatus = async () => {
   try {
+    if (!window.electronAPI) {
+      console.warn('API not available')
+      return
+    }
     const status = await window.electronAPI.getAPIStatus()
     apiStatus.running = status.running
     apiStatus.port = status.port
@@ -701,6 +780,10 @@ const loadAPIStatus = async () => {
 
 const loadIntegrationConfig = async () => {
   try {
+    if (!window.electronAPI) {
+      console.warn('API not available')
+      return
+    }
     const config = await window.electronAPI.getIntegrationConfig()
     if (config.autoExport) {
       autoBackupConfig.enabled = config.autoExport.enabled

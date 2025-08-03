@@ -25,6 +25,33 @@ interface ShellAPI {
   openPath: (path: string) => Promise<void>
 }
 
+interface DatabaseAPI {
+  saveUserPreference: (key: string, value: any, type?: string) => Promise<{ success: boolean; error?: string }>
+  getUserPreference: (key: string) => Promise<string | null>
+  getAllUserPreferences: () => Promise<any>
+  savePrivacySettings: (settings: any) => Promise<{ success: boolean; error?: string }>
+  getPrivacySettings: () => Promise<any>
+  saveDistractionSettings: (settings: any) => Promise<{ success: boolean; error?: string }>
+  getDistractionSettings: () => Promise<any>
+  backupDatabase: (backupPath: string) => Promise<{ success: boolean; error?: string }>
+  cleanupOldData: (cutoffDate: Date) => Promise<{ success: boolean; error?: string }>
+}
+
+interface FileAPI {
+  selectBackupLocation: () => Promise<{ canceled: boolean; filePaths: string[] }>
+  performBackup: (backupPath: string) => Promise<{ success: boolean; error?: string }>
+  cleanupOldData: (retentionDays: number) => Promise<{ success: boolean; error?: string }>
+}
+
+interface NotificationAPI {
+  test: (message?: string) => Promise<{ success: boolean; error?: string }>
+  show: (options: any) => Promise<void>
+}
+
+interface DialogAPI {
+  showOpenDialog: (options: any) => Promise<{ canceled: boolean; filePaths: string[] }>
+}
+
 interface ExtendedElectronAPI extends ElectronAPI {
   shell: ShellAPI
 }
@@ -33,6 +60,7 @@ declare global {
   interface Window {
     electron: ExtendedElectronAPI
     electronAPI: {
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
       // Export APIs
       exportJSON: (filters: any) => Promise<{ success: boolean; error?: string; recordCount?: number; fileSize?: number }>
       exportCSV: (filters: any) => Promise<{ success: boolean; error?: string; recordCount?: number; fileSize?: number }>
@@ -67,6 +95,11 @@ declare global {
       data: DataAPI
       activity: ActivityAPI
       shell: ShellAPI
+      database: DatabaseAPI
+      file: FileAPI
+      notification: NotificationAPI
     }
+    dialog: DialogAPI
+    notifications: NotificationAPI
   }
 }

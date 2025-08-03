@@ -4,7 +4,9 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin({
+      exclude: ['archiver', 'archiver-utils']
+    })]
   },
   preload: {
     plugins: [externalizeDepsPlugin()]

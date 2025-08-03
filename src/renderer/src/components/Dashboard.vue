@@ -71,14 +71,14 @@ const loadDashboardData = async () => {
           activeTime: 25200, // 7 hours
           idleTime: 3600, // 1 hour
           topApps: [
-            { name: 'Visual Studio Code', time: 14400, percentage: 57.1 },
-            { name: 'Chrome', time: 7200, percentage: 28.6 },
-            { name: 'Slack', time: 3600, percentage: 14.3 }
+            { name: 'Visual Studio Code', time: 14400, percentage: 57.1, productivity: 'productive' },
+            { name: 'Chrome', time: 7200, percentage: 28.6, productivity: 'neutral' },
+            { name: 'Slack', time: 3600, percentage: 14.3, productivity: 'distracting' }
           ],
           categories: [
-            { name: 'Development', time: 14400 },
-            { name: 'Web Browsing', time: 7200 },
-            { name: 'Communication', time: 3600 }
+            { name: 'Development', time: 14400, productivity: 'productive' },
+            { name: 'Web Browsing', time: 7200, productivity: 'neutral' },
+            { name: 'Communication', time: 3600, productivity: 'distracting' }
           ],
           productiveTime: 20160, // 5.6 hours
           distractingTime: 5040, // 1.4 hours

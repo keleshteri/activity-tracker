@@ -1,21 +1,14 @@
 import { join } from 'path'
 import { writeFileSync, readFileSync, existsSync, mkdirSync, createReadStream, createWriteStream } from 'fs'
-import { app, dialog } from 'electron'
+import { app } from 'electron'
 import archiver from 'archiver'
 import * as unzipper from 'unzipper'
 import * as crypto from 'crypto'
 import { DatabaseManager } from '../database'
 import {
   ActivityRecord,
-  DashboardData,
   WorkSession,
-  ProductivityMetrics,
-  AppCategory,
-  WorkPattern,
-  ProductivityInsight,
-  FocusSession,
-  BreakPattern,
-  TrackerConfig
+  ProductivityInsight
 } from '../types'
 
 export interface ExportFilters {
@@ -468,10 +461,7 @@ export class ExportManager {
     }
 
     if (dataTypes.includes('insights')) {
-      data.insights = await this.databaseManager.getInsights({
-        startTime: filters.startDate,
-        endTime: filters.endDate
-      })
+      data.insights = await this.databaseManager.getInsights('all', 20)
     }
 
     return data
@@ -526,10 +516,7 @@ export class ExportManager {
       endTime: period.end
     })
 
-    const insights = await this.databaseManager.getInsights({
-      startTime: period.start,
-      endTime: period.end
-    })
+    const insights = await this.databaseManager.getInsights('productivity', 10)
 
     // Calculate summary metrics
     const totalActiveTime = activities.reduce((sum, a) => sum + (a.isIdle ? 0 : a.duration), 0)
@@ -562,7 +549,7 @@ export class ExportManager {
           consistency: 'stable'
         }
       },
-      insights,
+      insights: insights as ProductivityInsight[],
       recommendations: this.generateRecommendations(activities, sessions)
     }
   }
@@ -619,7 +606,7 @@ export class ExportManager {
       hourlyData.set(hour, existing)
     })
 
-    const result = []
+    const result: Array<{ hour: number; productivity: number }> = []
     for (let hour = 0; hour < 24; hour++) {
       const data = hourlyData.get(hour) || { productivitySum: 0, count: 0 }
       result.push({
@@ -768,15 +755,22 @@ export class ExportManager {
     const key = crypto.scryptSync(password, 'salt', 32)
     const iv = crypto.randomBytes(16)
     
-    const cipher = crypto.createCipher(algorithm, key)
+    const cipher = crypto.createCipheriv(algorithm, key, iv)
     const input = createReadStream(inputPath)
     const output = createWriteStream(outputPath)
     
     return new Promise((resolve, reject) => {
-      output.write(iv)
-      input.pipe(cipher).pipe(output)
-      output.on('finish', resolve)
+      cipher.on('error', reject)
+      input.on('error', reject)
       output.on('error', reject)
+      
+      // Write IV first, then encrypted data
+      output.write(iv)
+      input.pipe(cipher).pipe(output, { end: false })
+      cipher.on('end', () => {
+        output.end()
+        resolve()
+      })
     })
   }
 
@@ -793,12 +787,18 @@ export class ExportManager {
       
       input.once('readable', () => {
         iv = input.read(16)
-        decipher = crypto.createDecipher(algorithm, key)
+        if (!iv || iv.length !== 16) {
+          reject(new Error('Failed to read IV from encrypted file'))
+          return
+        }
+        decipher = crypto.createDecipheriv(algorithm, key, iv)
+        decipher.on('error', reject)
         input.pipe(decipher).pipe(output)
       })
       
       output.on('finish', resolve)
       output.on('error', reject)
+      input.on('error', reject)
     })
   }
 

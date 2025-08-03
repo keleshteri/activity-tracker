@@ -2175,7 +2175,7 @@ export class DatabaseManager {
       this.db!.get(
         'SELECT * FROM goals WHERE id = ?',
         [goalId],
-        (err, row) => {
+        (err, row: any) => {
           if (err) {
             reject(err)
           } else {
@@ -2188,6 +2188,207 @@ export class DatabaseManager {
             } else {
               resolve(null)
             }
+          }
+        }
+      )
+    })
+  }
+
+  // Missing methods needed by API
+  async getWorkSessions(filters?: {
+    startTime?: number
+    endTime?: number
+    limit?: number
+  }): Promise<WorkSession[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    let query = 'SELECT * FROM work_sessions'
+    const params: any[] = []
+    const conditions: string[] = []
+
+    if (filters) {
+      if (filters.startTime) {
+        conditions.push('start_time >= ?')
+        params.push(filters.startTime)
+      }
+      if (filters.endTime) {
+        conditions.push('end_time <= ?')
+        params.push(filters.endTime)
+      }
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+
+    query += ' ORDER BY start_time DESC'
+
+    if (filters?.limit) {
+      query += ' LIMIT ?'
+      params.push(filters.limit)
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err)
+        else {
+          const sessions = rows.map((row) => ({
+            id: row.id,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            duration: row.duration,
+            focusScore: row.focus_score,
+            productivityRating: row.productivity_rating,
+            contextSwitches: row.context_switches,
+            breakDuration: row.break_duration,
+            dominantApp: row.dominant_app,
+            dominantCategory: row.dominant_category
+          }))
+          resolve(sessions)
+        }
+      })
+    })
+  }
+
+  async getProductivityMetrics(filters?: {
+    startDate?: string
+    endDate?: string
+    limit?: number
+  }): Promise<ProductivityMetrics[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    let query = 'SELECT * FROM productivity_metrics'
+    const params: any[] = []
+    const conditions: string[] = []
+
+    if (filters) {
+      if (filters.startDate) {
+        conditions.push('date >= ?')
+        params.push(filters.startDate)
+      }
+      if (filters.endDate) {
+        conditions.push('date <= ?')
+        params.push(filters.endDate)
+      }
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+
+    query += ' ORDER BY date DESC'
+
+    if (filters?.limit) {
+      query += ' LIMIT ?'
+      params.push(filters.limit)
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(query, params, (err, rows: any[]) => {
+        if (err) reject(err)
+        else {
+          const metrics = rows.map((row) => ({
+            id: row.id,
+            date: row.date,
+            totalActiveTime: row.total_active_time,
+            productiveTime: row.productive_time,
+            neutralTime: row.neutral_time,
+            distractingTime: row.distracting_time,
+            focusScore: row.focus_score,
+            contextSwitches: row.context_switches,
+            peakProductivityHour: row.peak_productivity_hour,
+            breakFrequency: row.break_frequency,
+            averageSessionDuration: row.average_session_duration
+          }))
+          resolve(metrics)
+        }
+      })
+    })
+  }
+
+  async getConfig(): Promise<Record<string, any>> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(
+        'SELECT key, value, type FROM user_preferences',
+        (err, rows: any[]) => {
+          if (err) reject(err)
+          else {
+            const config: Record<string, any> = {}
+            rows.forEach((row) => {
+              let value = row.value
+              switch (row.type) {
+                case 'number':
+                  value = parseFloat(value)
+                  break
+                case 'boolean':
+                  value = value === 'true'
+                  break
+                case 'json':
+                  try {
+                    value = JSON.parse(value)
+                  } catch {
+                    // Keep as string if JSON parsing fails
+                  }
+                  break
+              }
+              config[row.key] = value
+            })
+            resolve(config)
+          }
+        }
+      )
+    })
+  }
+
+  async updateConfig(config: Record<string, any>): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const promises = Object.entries(config).map(([key, value]) => {
+      let type: 'string' | 'number' | 'boolean' | 'json' = 'string'
+      if (typeof value === 'number') {
+        type = 'number'
+      } else if (typeof value === 'boolean') {
+        type = 'boolean'
+      } else if (typeof value === 'object' && value !== null) {
+        type = 'json'
+      }
+
+      return this.saveUserPreference(key, value, type)
+    })
+
+    await Promise.all(promises)
+  }
+
+  async getCurrentActivity(): Promise<ActivityRecord | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        'SELECT * FROM activities ORDER BY timestamp DESC LIMIT 1',
+        (err, row: any) => {
+          if (err) reject(err)
+          else if (!row) resolve(null)
+          else {
+            const activity: ActivityRecord = {
+              id: row.id,
+              timestamp: row.timestamp,
+              appName: row.appName,
+              windowTitle: row.windowTitle,
+              duration: row.duration,
+              category: row.category,
+              isIdle: Boolean(row.isIdle),
+              url: row.url,
+              cpuUsage: row.cpuUsage,
+              memoryUsage: row.memoryUsage,
+              focusScore: row.focusScore,
+              productivityRating: row.productivityRating,
+              contextSwitches: row.contextSwitches,
+              keystrokes: row.keystrokes,
+              mouseClicks: row.mouseClicks
+            }
+            resolve(activity)
           }
         }
       )
