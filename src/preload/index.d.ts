@@ -32,6 +32,35 @@ interface ExtendedElectronAPI extends ElectronAPI {
 declare global {
   interface Window {
     electron: ExtendedElectronAPI
+    electronAPI: {
+      // Export APIs
+      exportJSON: (filters: any) => Promise<{ success: boolean; error?: string; recordCount?: number; fileSize?: number }>
+      exportCSV: (filters: any) => Promise<{ success: boolean; error?: string; recordCount?: number; fileSize?: number }>
+      generateProductivityReport: (format: string, period: any) => Promise<{ success: boolean; error?: string }>
+      openExportFolder: () => Promise<void>
+      
+      // Backup APIs
+      createBackup: (options: any) => Promise<{ success: boolean; error?: string; backupSize?: number }>
+      restoreBackup: (backupPath: string, options: any) => Promise<{ success: boolean; error?: string; recordsImported?: number }>
+      selectBackupFile: () => Promise<{ canceled: boolean; filePaths: string[] }>
+      openBackupFolder: () => Promise<void>
+      
+      // API Server APIs
+      startAPI: () => Promise<{ success: boolean; error?: string; port?: number }>
+      stopAPI: () => Promise<{ success: boolean; error?: string }>
+      getAPIStatus: () => Promise<{ running: boolean; port: number }>
+      
+      // Webhook APIs
+      createWebhook: (webhook: any) => Promise<{ success: boolean; error?: string; webhook?: any }>
+      updateWebhook: (id: string, webhook: any) => Promise<{ success: boolean; error?: string }>
+      deleteWebhook: (id: string) => Promise<{ success: boolean; error?: string }>
+      listWebhooks: () => Promise<any[]>
+      testWebhook: (id: string) => Promise<{ success: boolean; error?: string }>
+      
+      // Integration Config APIs
+      getIntegrationConfig: () => Promise<any>
+      updateIntegrationConfig: (config: any) => Promise<{ success: boolean; error?: string }>
+    }
     api: {
       tracker: TrackerAPI
       dashboard: DashboardAPI

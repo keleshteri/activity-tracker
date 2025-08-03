@@ -316,6 +316,22 @@ export class DatabaseManager {
       )
     `
 
+    const createGoalsTable = `
+      CREATE TABLE IF NOT EXISTS goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        type TEXT CHECK(type IN ('time', 'sessions', 'productivity', 'custom')) NOT NULL,
+        target_value REAL NOT NULL,
+        current_value REAL DEFAULT 0,
+        deadline TEXT,
+        priority TEXT CHECK(priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
+        status TEXT CHECK(status IN ('active', 'completed', 'paused', 'cancelled')) DEFAULT 'active',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `
+
     const createIndexes = `
       CREATE INDEX IF NOT EXISTS idx_activities_timestamp ON activities(timestamp);
       CREATE INDEX IF NOT EXISTS idx_activities_app_name ON activities(app_name);
@@ -337,6 +353,9 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key);
       CREATE INDEX IF NOT EXISTS idx_distraction_events_timestamp ON distraction_events(timestamp);
       CREATE INDEX IF NOT EXISTS idx_distraction_events_app_name ON distraction_events(app_name);
+      CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
+      CREATE INDEX IF NOT EXISTS idx_goals_deadline ON goals(deadline);
+      CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
     `
 
     return new Promise((resolve, reject) => {
@@ -368,6 +387,7 @@ export class DatabaseManager {
         this.db!.run(createUserPreferencesTable)
         this.db!.run(createDistractionSettingsTable)
         this.db!.run(createDistractionEventsTable)
+        this.db!.run(createGoalsTable)
         this.db!.run(createIndexes, (err) => {
           if (err) reject(err)
           else resolve()
@@ -2060,6 +2080,117 @@ export class DatabaseManager {
           }
         )
       })
+    })
+  }
+
+  async getAllGoals(): Promise<any[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(
+        'SELECT * FROM goals ORDER BY created_at DESC',
+        [],
+        (err, rows) => {
+          if (err) {
+            reject(err)
+          } else {
+            resolve(rows || [])
+          }
+        }
+      )
+    })
+  }
+
+  async saveGoal(goal: any): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      if (goal.id) {
+        // Update existing goal
+        this.db!.run(
+          `UPDATE goals SET 
+           title = ?, description = ?, type = ?, target_value = ?, 
+           current_value = ?, deadline = ?, priority = ?, status = ?, 
+           updated_at = ?
+           WHERE id = ?`,
+          [
+            goal.title, goal.description, goal.type, goal.targetValue,
+            goal.currentValue || 0, goal.deadline, goal.priority, 
+            goal.status || 'active', Date.now(), goal.id
+          ],
+          function (err) {
+            if (err) {
+              reject(err)
+            } else {
+              resolve(goal.id)
+            }
+          }
+        )
+      } else {
+        // Insert new goal
+        this.db!.run(
+          `INSERT INTO goals (
+            title, description, type, target_value, current_value, 
+            deadline, priority, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            goal.title, goal.description, goal.type, goal.targetValue,
+            goal.currentValue || 0, goal.deadline, goal.priority,
+            goal.status || 'active', Date.now(), Date.now()
+          ],
+          function (err) {
+            if (err) {
+              reject(err)
+            } else {
+              resolve(this.lastID)
+            }
+          }
+        )
+      }
+    })
+  }
+
+  async deleteGoal(goalId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        'DELETE FROM goals WHERE id = ?',
+        [goalId],
+        (err) => {
+          if (err) {
+            reject(err)
+          } else {
+            resolve()
+          }
+        }
+      )
+    })
+  }
+
+  async getGoalProgress(goalId: string): Promise<any> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(
+        'SELECT * FROM goals WHERE id = ?',
+        [goalId],
+        (err, row) => {
+          if (err) {
+            reject(err)
+          } else {
+            if (row) {
+              const progress = row.target_value > 0 ? row.current_value / row.target_value : 0
+              resolve({
+                ...row,
+                progress: Math.min(progress, 1)
+              })
+            } else {
+              resolve(null)
+            }
+          }
+        }
+      )
     })
   }
 

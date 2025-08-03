@@ -9,6 +9,7 @@ import { ActivityTracker } from './tracker'
 import { FocusManager } from './focus-manager'
 import { DistractionDetector } from './distraction-detector'
 import { AppCategorizer } from './app-categorizer'
+import { IntegrationManager } from './integration'
 import { TrackerConfig, DashboardData } from './types'
 
 // Set app name early for proper recognition
@@ -21,6 +22,7 @@ let activityTracker: ActivityTracker
 let focusManager: FocusManager
 let distractionDetector: DistractionDetector
 let appCategorizer: AppCategorizer
+let integrationManager: IntegrationManager
 
 function createWindow(): void {
   // Create the browser window.
@@ -488,6 +490,66 @@ function setupIPC(): void {
         throw error
       }
     })
+
+    // Goal tracking handlers
+    ipcMain.handle('goals:get-all', async () => {
+      try {
+        return await databaseManager.getAllGoals()
+      } catch (error) {
+        console.error('Failed to get goals:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('goals:save', async (_, goal) => {
+      try {
+        await databaseManager.saveGoal(goal)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to save goal:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('goals:delete', async (_, goalId: string) => {
+      try {
+        await databaseManager.deleteGoal(goalId)
+        return { success: true }
+      } catch (error) {
+        console.error('Failed to delete goal:', error)
+        throw error
+      }
+    })
+
+    ipcMain.handle('goals:get-progress', async (_, goalId: string) => {
+      try {
+        return await databaseManager.getGoalProgress(goalId)
+      } catch (error) {
+        console.error('Failed to get goal progress:', error)
+        throw error
+      }
+    })
+
+    // Webhook handlers
+    ipcMain.handle('webhook:list', async () => {
+      try {
+        const api = integrationManager.getAPI()
+        return api.getConfig().webhooks.endpoints
+      } catch (error) {
+        console.error('Failed to get webhooks:', error)
+        throw error
+      }
+    })
+
+    // Integration config handlers
+    ipcMain.handle('integration:config:get', async () => {
+      try {
+        return integrationManager.getConfig()
+      } catch (error) {
+        console.error('Failed to get integration config:', error)
+        throw error
+      }
+    })
 }
 
 // Initialize the application
@@ -512,9 +574,24 @@ async function initializeApp(): Promise<void> {
     // Initialize app categorizer
     appCategorizer = new AppCategorizer(databaseManager)
     
+    // Initialize integration manager
+    integrationManager = new IntegrationManager(databaseManager)
+    await integrationManager.start()
+    
     // Connect distraction detector to activity tracker
     activityTracker.on('activity-recorded', (activity) => {
       distractionDetector.onActivityChange(activity)
+      // Notify integration manager for webhooks
+      integrationManager.notifyActivityCreated(activity)
+    })
+
+    // Connect focus manager events
+    focusManager.on('session-started', (session) => {
+      integrationManager.notifySessionStarted(session)
+    })
+    
+    focusManager.on('session-ended', (session) => {
+      integrationManager.notifySessionEnded(session)
     })
 
     // Setup IPC communication
@@ -564,6 +641,11 @@ app.on('window-all-closed', () => {
     activityTracker.stop()
   }
 
+  // Stop integration manager
+  if (integrationManager) {
+    integrationManager.stop()
+  }
+
   // Close database connection
   if (databaseManager) {
     databaseManager.close()
@@ -578,6 +660,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   if (activityTracker) {
     activityTracker.stop()
+  }
+  if (integrationManager) {
+    integrationManager.stop()
   }
   if (databaseManager) {
     databaseManager.close()

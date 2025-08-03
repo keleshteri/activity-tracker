@@ -8,6 +8,8 @@ import DistractionManagement from '../components/DistractionManagement.vue'
 import FocusSession from '../components/FocusSession.vue'
 import PatternAnalysis from '../components/PatternAnalysis.vue'
 import GoalTracking from '../components/GoalTracking.vue'
+import ExportIntegration from './views/ExportIntegration.vue'
+import NotificationContainer from './components/NotificationContainer.vue'
 
 const activeTab = ref('dashboard')
 const isTracking = ref(false)
@@ -22,6 +24,7 @@ const tabs = [
   { id: 'focus', name: 'Focus Sessions', icon: '⏱️' },
   { id: 'distraction', name: 'Distraction Management', icon: '🚫' },
   { id: 'categorization', name: 'App Categories', icon: '📂' },
+  { id: 'export', name: 'Export & Integration', icon: '📤' },
   { id: 'settings', name: 'Settings', icon: '⚙️' }
 ]
 
@@ -124,8 +127,12 @@ onUnmounted(() => {
       <FocusSession v-if="activeTab === 'focus'" />
       <DistractionManagement v-if="activeTab === 'distraction'" />
       <AppCategorization v-if="activeTab === 'categorization'" />
+      <ExportIntegration v-if="activeTab === 'export'" />
       <Settings v-if="activeTab === 'settings'" />
     </main>
+    
+    <!-- Global Notification Container -->
+    <NotificationContainer />
   </div>
 </template>
 
