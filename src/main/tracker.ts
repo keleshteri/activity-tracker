@@ -104,6 +104,7 @@ export class ActivityTracker extends EventEmitter {
       }
 
       console.log('Activity tracking started successfully')
+      this.emit('status-changed', this.getStatus())
     } catch (error) {
       console.error('Failed to start activity tracking:', error)
       this.stop() // Clean up if start fails
@@ -145,6 +146,7 @@ export class ActivityTracker extends EventEmitter {
       this.config.trackingEnabled = false
 
       console.log('Activity tracking stopped successfully')
+      this.emit('status-changed', this.getStatus())
     } catch (error) {
       console.error('Error during stop:', error)
       // Force stop even if there are errors
@@ -173,10 +175,16 @@ export class ActivityTracker extends EventEmitter {
     return { ...this.config }
   }
 
-  getStatus(): { isTracking: boolean; currentApp?: string } {
+  getStatus(): { isTracking: boolean; currentApp?: string; sessionDuration: number; todayDuration: number } {
+    const sessionDuration = this.sessionManager.getCurrentSessionDuration()
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    
     return {
       isTracking: this.isRunning,
-      currentApp: this.currentActivity?.appName
+      currentApp: this.currentActivity?.appName,
+      sessionDuration: sessionDuration,
+      todayDuration: 0 // Will be calculated from database if needed
     }
   }
 

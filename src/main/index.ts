@@ -10,6 +10,7 @@ import { FocusManager } from './focus-manager'
 import { DistractionDetector } from './distraction-detector'
 import { AppCategorizer } from './app-categorizer'
 import { IntegrationManager } from './integration'
+import { TrayManager } from './tray'
 import { TrackerConfig, DashboardData } from './types'
 
 // Set app name early for proper recognition
@@ -23,6 +24,7 @@ let focusManager: FocusManager
 let distractionDetector: DistractionDetector
 let appCategorizer: AppCategorizer
 let integrationManager: IntegrationManager
+let trayManager: TrayManager
 
 function createWindow(): void {
   // Create the browser window.
@@ -577,6 +579,10 @@ async function initializeApp(): Promise<void> {
     integrationManager = new IntegrationManager(databaseManager)
     await integrationManager.start()
     
+    // Initialize tray manager
+    trayManager = new TrayManager(activityTracker)
+    trayManager.initialize()
+    
     // Connect distraction detector to activity tracker
     activityTracker.on('activity-recorded', (activity) => {
       distractionDetector.onActivityChange(activity)
@@ -592,6 +598,13 @@ async function initializeApp(): Promise<void> {
     focusManager.on('session-ended', (session) => {
       integrationManager.notifySessionEnded(session)
     })
+    
+    // Update tray status periodically
+    setInterval(() => {
+      if (trayManager) {
+        trayManager.updateStatus()
+      }
+    }, 5000) // Update every 5 seconds
 
     // Setup IPC communication
     setupIPC()
@@ -645,6 +658,11 @@ app.on('window-all-closed', () => {
     integrationManager.stop()
   }
 
+  // Cleanup tray
+  if (trayManager) {
+    trayManager.cleanup()
+  }
+
   // Close database connection
   if (databaseManager) {
     databaseManager.close()
@@ -662,6 +680,9 @@ app.on('before-quit', () => {
   }
   if (integrationManager) {
     integrationManager.stop()
+  }
+  if (trayManager) {
+    trayManager.cleanup()
   }
   if (databaseManager) {
     databaseManager.close()

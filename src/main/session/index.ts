@@ -9,6 +9,7 @@ export interface SessionManager {
   createProductivityBlocks(activities: ActivityRecord[]): ProductivityBlock[]
   getCurrentSession(): WorkSession | null
   isInSession(): boolean
+  getCurrentSessionDuration(): number
 }
 
 export class WorkSessionManager implements SessionManager {
@@ -210,6 +211,13 @@ export class WorkSessionManager implements SessionManager {
 
   isInSession(): boolean {
     return this.currentSession !== null
+  }
+
+  getCurrentSessionDuration(): number {
+    if (!this.currentSession) {
+      return 0
+    }
+    return Date.now() - this.currentSession.startTime
   }
 
   private classifyBreak(duration: number): 'micro' | 'short' | 'long' {
